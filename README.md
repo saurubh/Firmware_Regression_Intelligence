@@ -764,6 +764,16 @@ fri investigate --gitman ~/BHS_2026/birchstream-ih/gitman.yml \
   --good '...' --bad '...' --failure os_boot --fast --top 20 --html --json
 ```
 
+Interrupted runs **resume by default**. Analyzed commits are stored under `output/cache/` (keyed by workspace + good + bad + failure). Restart the same command and FRI skips `birchstream-ih`'s 215 commits and continues at Edk2.
+
+```bash
+# resume (default)
+fri investigate --gitman ... --failure os_boot --fast --html --json
+
+# wipe cache and scan every commit again
+fri investigate --gitman ... --failure os_boot --fast --fresh --html --json
+```
+
 Tune in `config/config.yaml`: `analysis.workers`, `git.list_timeout_sec`, `git.diff_timeout_sec`.
 
 ## 4. Explicit pin manifest

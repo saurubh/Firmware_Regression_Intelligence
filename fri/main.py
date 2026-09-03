@@ -69,7 +69,11 @@ def main() -> int:
         if args.manifest:
             logger.info("Manifest     : %s", args.manifest)
             report = engine.investigate_manifest(
-                args.manifest, args.failure, workers=args.workers, fast=args.fast
+                args.manifest,
+                args.failure,
+                workers=args.workers,
+                fast=args.fast,
+                fresh=args.fresh,
             )
         elif args.gitman:
             logger.info("gitman.yml   : %s", args.gitman)
@@ -82,6 +86,7 @@ def main() -> int:
                 args.failure,
                 workers=args.workers,
                 fast=args.fast,
+                fresh=args.fresh,
             )
         elif args.workspace:
             logger.info("Workspace    : %s", args.workspace)
@@ -94,6 +99,7 @@ def main() -> int:
                 args.failure,
                 workers=args.workers,
                 fast=args.fast,
+                fresh=args.fresh,
             )
         else:
             logger.info("Repository   : %s", args.repo)
@@ -105,6 +111,7 @@ def main() -> int:
                 failure=args.failure,
                 workers=args.workers,
                 fast=args.fast,
+                fresh=args.fresh,
             )
         ConsoleReport().render(report, top=args.top)
         if args.html:

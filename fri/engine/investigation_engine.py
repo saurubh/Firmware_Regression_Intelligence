@@ -13,6 +13,7 @@ import os
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+from pathlib import Path
 
 from fri.analyzer.bisect_planner import BisectPlanner
 from fri.analyzer.candidate_engine import CandidateEngine
@@ -21,9 +22,10 @@ from fri.analyzer.module_analyzer import ModuleAnalyzer
 from fri.analyzer.triage import BootTriage
 from fri.classifier.classifier import FirmwareClassifier
 from fri.collector.git_collector import GitCollector, has_source_paths
+from fri.collector.run_cache import InvestigationCache
 from fri.collector.workspace import WorkspaceCollector
 from fri.config import config
-from fri.constants import HIGH_CONFIDENCE
+from fri.constants import HIGH_CONFIDENCE, OUTPUT_DIR
 from fri.logger import logger
 from fri.models import (
     Commit,
@@ -97,11 +99,21 @@ class InvestigationEngine:
         failure,
         workers: int | None = None,
         fast: bool = False,
+        fresh: bool = False,
+        cache_dir: str | None = None,
     ) -> RegressionReport:
         started = time.perf_counter()
         failure_key = failure.lower()
         profile = config.get_failure_profile(failure_key)
         options = _analysis_options(workers=workers, fast=fast)
+        cache = InvestigationCache(
+            Path(cache_dir) if cache_dir else OUTPUT_DIR / "cache",
+            plan,
+            failure_key,
+        )
+        if fresh:
+            cache.reset()
+        cache.load()
 
         report = RegressionReport(
             good_sha=plan.good_label,
@@ -155,9 +167,30 @@ class InvestigationEngine:
                 window.name,
                 len(commits),
             )
+            hits: list[tuple[Commit, RegressionCandidate]] = []
+            pending_commits: list[Commit] = []
+            for commit in commits:
+                cached = cache.get(window.name, commit.sha)
+                if cached is not None:
+                    hits.append(cached)
+                else:
+                    pending_commits.append(commit)
+            if hits:
+                logger.info(
+                    "  %s: resuming %d cached, %d still to analyze",
+                    window.name,
+                    len(hits),
+                    len(pending_commits),
+                )
+                for cached_commit, cached_candidate in hits:
+                    regression_candidates.append(cached_candidate)
+                    all_commits.append(cached_commit)
             bar = ProgressBar(f"{repo_index}/{len(windows)} {window.name}", len(commits))
+            done_count = len(hits)
+            if done_count:
+                bar.update(done_count, f"resumed {done_count}")
             if options.workers <= 1:
-                for index, commit in enumerate(commits, start=1):
+                for index, commit in enumerate(pending_commits, start=1):
                     try:
                         result = self._process_commit(
                             window,
@@ -166,11 +199,12 @@ class InvestigationEngine:
                             failure_key,
                             options,
                             bar=bar,
-                            index=index,
+                            index=done_count + index,
                         )
                         if result is None:
                             continue
                         commit, candidate = result
+                        cache.put(window.name, commit, candidate)
                         regression_candidates.append(candidate)
                         all_commits.append(commit)
                     except Exception as exc:
@@ -192,16 +226,16 @@ class InvestigationEngine:
                             failure_key,
                             options,
                         ): commit
-                        for commit in commits
+                        for commit in pending_commits
                     }
                     pending = set(futures)
                     while pending:
-                        done, pending = wait(
+                        finished, pending = wait(
                             pending,
                             timeout=15,
                             return_when=FIRST_COMPLETED,
                         )
-                        if not done:
+                        if not finished:
                             waiting = [futures[item].short_sha for item in pending]
                             logger.info(
                                 "Still analyzing %d %s commit(s): %s",
@@ -210,7 +244,7 @@ class InvestigationEngine:
                                 ", ".join(waiting[:8]),
                             )
                             continue
-                        for future in done:
+                        for future in finished:
                             commit = futures[future]
                             try:
                                 result = future.result()
@@ -218,6 +252,7 @@ class InvestigationEngine:
                                     bar.tick(f"skip {commit.short_sha}")
                                     continue
                                 done_commit, candidate = result
+                                cache.put(window.name, done_commit, candidate)
                                 regression_candidates.append(candidate)
                                 all_commits.append(done_commit)
                                 bar.tick(f"done {done_commit.short_sha}")

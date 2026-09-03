@@ -74,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Faster run: parallel workers + skip diffs on binary-only commits",
     )
+    investigate.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Ignore saved progress and re-analyze every commit (default is resume)",
+    )
     investigate.add_argument("--html", action="store_true", help="Generate HTML dashboard")
     investigate.add_argument("--json", action="store_true", help="Generate JSON report")
     investigate.add_argument("--verbose", action="store_true", help="Enable verbose logging")
