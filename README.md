@@ -682,6 +682,25 @@ fri investigate \
 
 FRI walks **every moved repo**, tags each candidate with the repository name, ranks them on one list, and groups modules as `edk2 / ACPI` vs `Intel / FSP`. Bisect hints are **per moved repo** (`git -C edk2 bisect start <bad-pin> <good-pin>`). Do not bisect the superproject SHA as if the whole BIOS were one Git history.
 
+### Same tag name in every Git repo
+
+BIOS programs usually stamp **the same tag string** on platform, edk2, Intel, and edk2-platforms (`BHS_WW32_GOOD` / `BHS_WW33_BAD`). FRI looks that name up **inside each sub-repo** first (`refs/tags/<name>`), then falls back to the superproject gitlink if that repo has no such tag.
+
+```text
+--good GOOD_TAG  --bad BAD_TAG
+
+platform          tag GOOD_TAG  ->  tag BAD_TAG
+edk2              tag GOOD_TAG  ->  tag BAD_TAG
+Intel             tag GOOD_TAG  ->  tag BAD_TAG   (or gitlink if Intel has no tag)
+edk2-platforms    gitlink pin   ->  gitlink pin   (no tag in that clone)
+```
+
+The pin table `via` column shows `tag/tag`, `tag/gitlink`, `gitlink/gitlink`, or `sha/sha`. Tags win when they disagree with the gitlink — that is how an Intel tree tagged independently of the platform pin is still compared.
+
+Tags must exist **locally** in each clone (`git fetch --tags` and `git submodule foreach git fetch --tags`). FRI does not hit the network to discover remote tags.
+
+If you pass SHAs instead of tag names, behavior is unchanged: each sub-repo uses the gitlink at the superproject’s good/bad commits.
+
 ## 3. Explicit pin manifest
 
 When repos are siblings (not submodules), or you already know the SHAs from a build database:

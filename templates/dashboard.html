@@ -561,6 +561,7 @@ Moved Repos
 
 <th style="padding:8px;">Repo</th>
 <th style="padding:8px;">Status</th>
+<th style="padding:8px;">Resolved via</th>
 <th style="padding:8px;">Commits</th>
 <th style="padding:8px;">Good pin</th>
 <th style="padding:8px;">Bad pin</th>
@@ -577,6 +578,7 @@ Moved Repos
 
 <td style="padding:8px;font-weight:bold;">{{ delta.name }}</td>
 <td style="padding:8px;">{{ delta.status }}</td>
+<td style="padding:8px;">{{ delta.good_source or "-" }} / {{ delta.bad_source or "-" }}</td>
 <td style="padding:8px;">{{ delta.commit_count }}</td>
 <td style="padding:8px;font-family:monospace;">{{ (delta.good_sha or "-")[:12] }}</td>
 <td style="padding:8px;font-family:monospace;">{{ (delta.bad_sha or "-")[:12] }}</td>

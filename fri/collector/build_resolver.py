@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 
-from git.exc import BadName
+from git.exc import BadName, GitCommandError
 
 from fri.logger import logger
 
@@ -95,6 +95,36 @@ class BuildResolver:
 
             ) from err
 
+    @staticmethod
+    def resolve_label(repo, build: str) -> tuple[str | None, str]:
+        """
+        Resolve a tag, branch, or SHA in *this* repository.
+
+        Tags are preferred so the same BIOS tag name can be looked up
+        independently in edk2, Intel, and the platform tree.
+
+        Returns (sha, source) where source is tag, branch, sha, ref, or missing.
+        """
+        if not build:
+            return None, "missing"
+        try:
+            sha = repo.git.rev_parse("--verify", f"refs/tags/{build}^{{commit}}")
+            return sha.strip(), "tag"
+        except GitCommandError:
+            pass
+        try:
+            sha = repo.git.rev_parse("--verify", f"refs/heads/{build}")
+            return sha.strip(), "branch"
+        except GitCommandError:
+            pass
+        try:
+            sha = repo.commit(build).hexsha
+            if _looks_like_sha(build):
+                return sha, "sha"
+            return sha, "ref"
+        except Exception:
+            return None, "missing"
+
     # ------------------------------------------------------
 
     def exists(self, build: str) -> bool:
@@ -149,3 +179,8 @@ class BuildResolver:
     def current_commit(self):
 
         return self.repo.head.commit.hexsha
+
+
+def _looks_like_sha(value: str) -> bool:
+    token = value.strip().lower()
+    return 7 <= len(token) <= 40 and all(ch in "0123456789abcdef" for ch in token)

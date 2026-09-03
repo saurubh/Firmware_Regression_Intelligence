@@ -41,11 +41,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     investigate.add_argument(
         "--good",
-        help="Known-good superproject build, tag or commit (with --repo or --workspace)",
+        help="Known-good BIOS tag, branch or commit. "
+        "With --workspace, this same name is looked up in every sub-repo.",
     )
     investigate.add_argument(
         "--bad",
-        help="Known-bad superproject build, tag or commit (with --repo or --workspace)",
+        help="Known-bad BIOS tag, branch or commit. "
+        "With --workspace, this same name is looked up in every sub-repo.",
     )
     investigate.add_argument(
         "--failure",
@@ -63,8 +65,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show which submodules/repos moved between two BIOS builds",
     )
     pins.add_argument("--workspace", required=True, help="BIOS superproject path")
-    pins.add_argument("--good", required=True, help="Known-good tag or commit")
-    pins.add_argument("--bad", required=True, help="Known-bad tag or commit")
+    pins.add_argument(
+        "--good",
+        required=True,
+        help="Known-good tag or commit (searched in each sub-repo, then gitlink)",
+    )
+    pins.add_argument(
+        "--bad",
+        required=True,
+        help="Known-bad tag or commit (searched in each sub-repo, then gitlink)",
+    )
 
     subparsers.add_parser("doctor", help="Validate FRI installation and list profiles")
     subparsers.add_parser("config", help="Display loaded configuration")

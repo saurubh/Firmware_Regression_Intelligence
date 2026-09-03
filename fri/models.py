@@ -199,6 +199,8 @@ class RepoDelta:
     bad_sha: str
     commit_count: int = 0
     status: str = "changed"  # changed | unchanged | missing
+    good_source: str = ""  # tag | gitlink | sha | branch | ref | missing
+    bad_source: str = ""
 
 
 @dataclass

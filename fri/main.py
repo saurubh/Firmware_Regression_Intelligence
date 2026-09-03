@@ -145,11 +145,12 @@ def _pins(workspace: str, good: str, bad: str) -> int:
     print(f"Good      : {plan.good_label}")
     print(f"Bad       : {plan.bad_label}")
     print()
-    print(f"{'repo':<28} {'status':<12} {'good':<12} {'bad':<12}")
-    print("-" * 70)
+    print(f"{'repo':<28} {'status':<10} {'via':<16} {'good':<12} {'bad':<12}")
+    print("-" * 80)
     for delta in plan.deltas:
+        via = f"{delta.good_source or '-'}/{delta.bad_source or '-'}"
         print(
-            f"{delta.name:<28} {delta.status:<12} "
+            f"{delta.name:<28} {delta.status:<10} {via:<16} "
             f"{(delta.good_sha or '-'):<12.12} {(delta.bad_sha or '-'):<12.12}"
         )
     moved = [item for item in plan.deltas if item.status == "changed"]

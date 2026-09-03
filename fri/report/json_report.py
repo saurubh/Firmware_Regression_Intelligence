@@ -37,6 +37,8 @@ class JsonReport:
                     "bad_sha": delta.bad_sha,
                     "commit_count": delta.commit_count,
                     "status": delta.status,
+                    "good_source": delta.good_source,
+                    "bad_source": delta.bad_source,
                 }
                 for delta in report.repo_deltas
             ],

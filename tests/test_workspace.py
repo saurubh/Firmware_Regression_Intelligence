@@ -138,9 +138,82 @@ repos:
     assert deltas["edk2"] == "unchanged"
 
 
+def test_same_tags_resolved_in_each_subrepo(tmp_path: Path):
+    """Tag names win over unchanged gitlinks in every Git repo."""
+    edk2 = tmp_path / "edk2_upstream"
+    edk_repo = _init_repo(edk2)
+    _write(edk2 / "MdeModulePkg" / "Universal" / "BdsDxe" / "BdsEntry.c", "void BdsEntry(void) { }\n")
+    edk_repo.index.add(["MdeModulePkg/Universal/BdsDxe/BdsEntry.c"])
+    edk_repo.index.commit("edk2: good BDS")
+    good_edk = edk_repo.head.commit.hexsha
+    edk_repo.create_tag("GOOD_BUILD")
+
+    _write(edk2 / "MdeModulePkg" / "Core" / "Pei" / "PeiMain.c", "void PeiCore(void) { }\n")
+    edk_repo.index.add(["MdeModulePkg/Core/Pei/PeiMain.c"])
+    edk_repo.index.commit("edk2: middle pin (no BIOS tag)")
+    middle_edk = edk_repo.head.commit.hexsha
+
+    bds = edk2 / "MdeModulePkg" / "Universal" / "BdsDxe" / "BdsEntry.c"
+    bds.write_text(
+        "void BdsEntry(void) { gBS->ExitBootServices(ImageHandle, MapKey); }\n",
+        encoding="utf-8",
+    )
+    edk_repo.index.add(["MdeModulePkg/Universal/BdsDxe/BdsEntry.c"])
+    edk_repo.index.commit("BIOS-99: ExitBootServices hang")
+    bad_edk = edk_repo.head.commit.hexsha
+    edk_repo.create_tag("BAD_BUILD")
+
+    ws = tmp_path / "platform"
+    plat = _init_repo(ws)
+    _write(ws / "PlatformPkg" / "Platform.c", "void PlatformInit(void) { }\n")
+    plat.index.add(["PlatformPkg/Platform.c"])
+    plat.index.commit("platform: initial")
+    with plat.git.custom_environment(
+        GIT_CONFIG_COUNT="1",
+        GIT_CONFIG_KEY_0="protocol.file.allow",
+        GIT_CONFIG_VALUE_0="always",
+    ):
+        plat.git.submodule("add", str(edk2.resolve()), "edk2")
+
+    nested = Repo(ws / "edk2")
+    nested.git.checkout(middle_edk)
+    plat.git.add("edk2")
+    plat.index.commit("platform: pin middle edk2")
+    plat.create_tag("GOOD_BUILD")
+
+    _write(ws / "PlatformPkg" / "AcpiTables" / "Dsdt.asl", "DefinitionBlock(){}\n")
+    plat.git.add("PlatformPkg/AcpiTables/Dsdt.asl")
+    plat.index.commit("platform: ACPI only, gitlink unchanged")
+    plat.create_tag("BAD_BUILD")
+
+    plan = WorkspaceCollector().plan_from_workspace(str(ws), "GOOD_BUILD", "BAD_BUILD")
+    edk = next(item for item in plan.deltas if item.name == "edk2")
+    assert edk.good_source == "tag"
+    assert edk.bad_source == "tag"
+    assert edk.good_sha == good_edk
+    assert edk.bad_sha == bad_edk
+    assert edk.good_sha != middle_edk
+    assert edk.status == "changed"
+
+    report = InvestigationEngine().investigate_workspace(
+        str(ws), "GOOD_BUILD", "BAD_BUILD", "os_boot"
+    )
+    assert any(candidate.commit.repo_name == "edk2" for candidate in report.candidates)
+
+
+def test_sha_falls_back_to_gitlink(tmp_path: Path):
+    ws, good, bad = _bios_workspace(tmp_path)
+    plan = WorkspaceCollector().plan_from_workspace(str(ws), good, bad)
+    edk = next(item for item in plan.deltas if item.name == "edk2")
+    assert edk.good_source == "gitlink"
+    assert edk.bad_source == "gitlink"
+    assert edk.status == "changed"
+
+
 def test_pins_command(tmp_path: Path, capsys):
     ws, good, bad = _bios_workspace(tmp_path)
     assert _pins(str(ws), good, bad) == 0
     output = capsys.readouterr().out
     assert "edk2" in output
     assert "changed" in output
+    assert "gitlink" in output

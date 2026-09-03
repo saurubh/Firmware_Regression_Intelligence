@@ -1,15 +1,31 @@
 # Example pin-set for a UEFI BIOS workspace.
 #
-# A "good build" and "bad build" are not one SHA. They are the joint pins of
-# the platform tree, edk2, edk2-platforms, and vendor silicon.
+# Prefer the same BIOS tag name in every Git repo:
+#   fri investigate --workspace /path/to/platform --good GOOD_BUILD_TAG --bad BAD_BUILD_TAG
 #
-# Usage:
+# FRI resolves GOOD_BUILD_TAG / BAD_BUILD_TAG in platform, edk2, Intel, ...
+# and falls back to .gitmodules gitlinks when a repo has no such tag.
+#
+# Manifest form (same tag names, or per-repo overrides):
 #   fri investigate --manifest config/workspace.example.yaml --failure from_reset
-#
-# You can omit `repos` and let FRI read .gitmodules from --workspace good/bad:
-#   workspace: /home/you/BHS_2026/birchstream-rv
-#   good: GOOD_TAG
-#   bad: BAD_TAG
+
+workspace: /path/to/platform-superproject
+good: GOOD_BUILD_TAG
+bad: BAD_BUILD_TAG
+
+repos:
+  - name: platform
+    path: .
+  - name: edk2
+    path: edk2
+  - name: edk2-platforms
+    path: edk2-platforms
+  - name: Intel
+    path: Intel
+    # Optional per-repo overrides when a repo is not a submodule pin:
+    # good: abcdef1
+    # bad:  89abcde
+
 
 workspace: /path/to/platform-superproject
 good: GOOD_BUILD_TAG

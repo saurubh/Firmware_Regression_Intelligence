@@ -42,11 +42,12 @@ class ConsoleReport:
             print("PIN-SET  (repos that moved between the two BIOS builds)")
             print("=" * 90)
             print()
-            print(f"{'repo':<28} {'status':<12} {'commits':<8} {'good':<12} {'bad':<12}")
-            print("-" * 80)
+            print(f"{'repo':<28} {'status':<10} {'via':<16} {'commits':<8} {'good':<12} {'bad':<12}")
+            print("-" * 90)
             for delta in report.repo_deltas:
+                via = f"{delta.good_source or '-'}/{delta.bad_source or '-'}"
                 print(
-                    f"{delta.name:<28} {delta.status:<12} {delta.commit_count:<8} "
+                    f"{delta.name:<28} {delta.status:<10} {via:<16} {delta.commit_count:<8} "
                     f"{(delta.good_sha or '-'):<12.12} {(delta.bad_sha or '-'):<12.12}"
                 )
         if report.related_topics:
