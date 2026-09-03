@@ -753,7 +753,9 @@ FRI spends most time on **per-commit `git diff`**. v2.8 speeds this up in three 
 
 1. **Batch path listing** — one `git log --name-only` per repo instead of one `git diff-tree` per commit.
 2. **Parallel workers** — `--workers 4` or config `analysis.workers` (default **4**) analyze commits concurrently within each repo.
-3. **Binary-only skip** — commits that touch only `.fd`, `.bin`, `.efi`, etc. skip the diff; message and paths still score.
+3. **Skip huge / merge diffs** — Edk2 merges and `.uni`/`.json` blobs no longer get a full `git diff`. Truncating after a 1MB generate was too late; FRI now caps at 64KB, 8s, 40 C-like files, and skips merge diffs by default.
+
+If the bar sits at 85/87 for many minutes, those last commits were **Python scanning a huge truncated diff** (398 keywords × every line). v2.8.1 scans the blob once. You should see `Still analyzing N Edk2 commit(s): …` every 15s if anything is actually still in git.
 
 For a long Birch Stream run, add **`--fast`** (parallel + binary skip):
 

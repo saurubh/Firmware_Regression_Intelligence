@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 
 from fri.analyzer.bisect_planner import BisectPlanner
@@ -194,25 +194,41 @@ class InvestigationEngine:
                         ): commit
                         for commit in commits
                     }
-                    for future in as_completed(futures):
-                        commit = futures[future]
-                        try:
-                            result = future.result()
-                            if result is None:
-                                bar.tick(f"skip {commit.short_sha}")
-                                continue
-                            done_commit, candidate = result
-                            regression_candidates.append(candidate)
-                            all_commits.append(done_commit)
-                            bar.tick(f"done {done_commit.short_sha}")
-                        except Exception as exc:
-                            logger.warning(
-                                "Skipping %s %s: %s",
+                    pending = set(futures)
+                    while pending:
+                        done, pending = wait(
+                            pending,
+                            timeout=15,
+                            return_when=FIRST_COMPLETED,
+                        )
+                        if not done:
+                            waiting = [futures[item].short_sha for item in pending]
+                            logger.info(
+                                "Still analyzing %d %s commit(s): %s",
+                                len(waiting),
                                 window.name,
-                                commit.short_sha,
-                                exc,
+                                ", ".join(waiting[:8]),
                             )
-                            bar.tick(f"skip {commit.short_sha}")
+                            continue
+                        for future in done:
+                            commit = futures[future]
+                            try:
+                                result = future.result()
+                                if result is None:
+                                    bar.tick(f"skip {commit.short_sha}")
+                                    continue
+                                done_commit, candidate = result
+                                regression_candidates.append(candidate)
+                                all_commits.append(done_commit)
+                                bar.tick(f"done {done_commit.short_sha}")
+                            except Exception as exc:
+                                logger.warning(
+                                    "Skipping %s %s: %s",
+                                    window.name,
+                                    commit.short_sha,
+                                    exc,
+                                )
+                                bar.tick(f"skip {commit.short_sha}")
             bar.close()
             logger.info("  %s: finished %d commits", window.name, len(commits))
 
@@ -317,6 +333,8 @@ class InvestigationEngine:
         )
         if skip_diff:
             candidate.evidence.append("Binary-only paths; diff skipped for speed")
+        elif commit.is_merge_commit and not diff_text:
+            candidate.evidence.append("Merge commit; full diff skipped for speed")
         return commit, candidate
 
     @staticmethod

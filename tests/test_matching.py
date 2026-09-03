@@ -1,4 +1,4 @@
-from fri.utils.matching import keyword_in_text, path_matches
+from fri.utils.matching import KeywordIndex, keyword_in_text, path_matches
 
 
 def test_me_does_not_match_memory():
@@ -23,3 +23,11 @@ def test_secure_boot_spellings_are_equivalent():
     assert keyword_in_text("Enable SecureBoot policy", "SECURE BOOT")
     assert keyword_in_text("Enable Secure Boot policy", "SECUREBOOT")
     assert keyword_in_text("gBS->ExitBootServices", "EXITBOOTSERVICES")
+
+
+def test_keyword_index_finds_catalog_forms_once():
+    index = KeywordIndex(["EXITBOOTSERVICES", "acpi", "pci"])
+    hits = index.find("+  gBS->ExitBootServices(ImageHandle, MapKey);\n+  pci bus")
+    assert "EXITBOOTSERVICES" in hits
+    assert "acpi" not in hits
+

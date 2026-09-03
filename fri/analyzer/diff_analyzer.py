@@ -14,7 +14,7 @@ import re
 from fri.analyzer.hazard_detector import HazardDetector
 from fri.config import config
 from fri.models import DiffEvidence
-from fri.utils.matching import keyword_in_text
+from fri.utils.matching import KeywordIndex
 
 
 class DiffAnalyzer:
@@ -34,6 +34,7 @@ class DiffAnalyzer:
     def __init__(self) -> None:
         self.hazards = HazardDetector()
         self.keywords = config.keywords()
+        self._keyword_index = KeywordIndex(self.keywords)
 
     def analyze(self, diff_text: str) -> DiffEvidence:
         evidence = DiffEvidence()
@@ -45,6 +46,8 @@ class DiffAnalyzer:
         functions: set[str] = set()
         macros: set[str] = set()
         files: set[str] = set()
+        changed_chunks: list[str] = []
+        hot_limit = 3000
 
         for line in diff_text.splitlines():
             file_match = self.FILE_HEADER.match(line)
@@ -62,17 +65,17 @@ class DiffAnalyzer:
             else:
                 continue
 
-            for keyword in self.keywords:
-                if keyword_in_text(line, keyword):
-                    keywords.add(keyword)
+            if len(changed_chunks) < hot_limit:
+                changed_chunks.append(line)
+                match = self.FUNCTION_REGEX.match(line)
+                if match:
+                    functions.add(match.group(1))
+                match = self.MACRO_REGEX.match(line)
+                if match:
+                    macros.add(match.group(1))
 
-            match = self.FUNCTION_REGEX.match(line)
-            if match:
-                functions.add(match.group(1))
-
-            match = self.MACRO_REGEX.match(line)
-            if match:
-                macros.add(match.group(1))
+        changed = "\n".join(changed_chunks)
+        keywords.update(self._keyword_index.find(changed))
 
         evidence.firmware_keywords = sorted(keywords)
         evidence.modified_functions = sorted(functions)
@@ -83,11 +86,11 @@ class DiffAnalyzer:
             + evidence.modified_functions
             + evidence.modified_macros
         )
-        evidence.hazards = self.hazards.detect(diff_text)
-        evidence.pcd_names = self.hazards.pcd_names(diff_text)
-        evidence.protocol_hits = self.hazards.protocol_hits(diff_text)
-        evidence.boot_api_hits = self.hazards.boot_api_hits(diff_text)
-        evidence.comment_only = self.hazards.comment_only(diff_text)
+        evidence.hazards = self.hazards.detect(changed)
+        evidence.pcd_names = self.hazards.pcd_names(changed)
+        evidence.protocol_hits = self.hazards.protocol_hits(changed)
+        evidence.boot_api_hits = self.hazards.boot_api_hits(changed)
+        evidence.comment_only = self.hazards.comment_only(changed)
         evidence.score = self._score(evidence)
         return evidence
 

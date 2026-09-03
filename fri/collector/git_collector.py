@@ -53,6 +53,28 @@ SOURCE_SUFFIXES = {
     ".md",
 }
 
+# Diff these only. .uni/.json/.md trees in Edk2 can be multi-megabyte.
+DIFF_SUFFIXES = {
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".asl",
+    ".aslc",
+    ".inf",
+    ".dsc",
+    ".dec",
+    ".fdf",
+    ".vfr",
+    ".nasm",
+    ".asm",
+    ".s",
+    ".inc",
+    ".mac",
+    ".i",
+    ".acpi",
+}
+
 
 def _git_settings() -> dict:
     return config.settings.get("git") or {}
@@ -67,6 +89,10 @@ def _decode_git_bytes(data: bytes | None) -> str:
 def _is_source(path: str) -> bool:
     suffix = Path(path).suffix.lower()
     return suffix in SOURCE_SUFFIXES
+
+
+def _is_diff_source(path: str) -> bool:
+    return Path(path).suffix.lower() in DIFF_SUFFIXES
 
 
 def has_source_paths(paths: list[str]) -> bool:
@@ -101,11 +127,12 @@ class GitCollector:
             ) from err
 
         git_cfg = _git_settings()
-        self.diff_timeout_sec = int(git_cfg.get("diff_timeout_sec", 15))
+        self.diff_timeout_sec = int(git_cfg.get("diff_timeout_sec", 8))
         self.path_timeout_sec = int(git_cfg.get("path_timeout_sec", 20))
         self.list_timeout_sec = int(git_cfg.get("list_timeout_sec", 180))
-        self.max_source_paths = int(git_cfg.get("max_source_paths", 120))
-        self.max_diff_bytes = int(git_cfg.get("max_diff_bytes", 1_000_000))
+        self.max_source_paths = int(git_cfg.get("max_source_paths", 40))
+        self.max_diff_bytes = int(git_cfg.get("max_diff_bytes", 65536))
+        self.skip_merge_diffs = bool(git_cfg.get("skip_merge_diffs", True))
 
         #
         # Build resolver
@@ -252,8 +279,15 @@ class GitCollector:
         git_commit = commit.git_object
         if git_commit is None or not git_commit.parents:
             return ""
+        if self.skip_merge_diffs and commit.is_merge_commit:
+            logger.info(
+                "Skipping full diff for merge %s (%d files)",
+                commit.short_sha,
+                len(commit.files),
+            )
+            return ""
         parent = git_commit.parents[0].hexsha
-        sources = [path for path in commit.files if _is_source(path)][:self.max_source_paths]
+        sources = [path for path in commit.files if _is_diff_source(path)][:self.max_source_paths]
         if not sources:
             return ""
         stop = threading.Event()

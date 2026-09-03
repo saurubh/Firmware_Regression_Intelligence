@@ -207,46 +207,43 @@ class HazardDetector:
         if not diff_text:
             return []
 
+        blob = _changed_blob(diff_text)
+        if not blob:
+            return []
+
         found: dict[str, Hazard] = {}
-
-        for line in diff_text.splitlines():
-            if not (line.startswith("+") or line.startswith("-")):
+        for name, category, severity, pattern in _HAZARD_RULES:
+            match = pattern.search(blob)
+            if not match:
                 continue
-            if line.startswith("+++") or line.startswith("---"):
-                continue
-
-            for name, category, severity, pattern in _HAZARD_RULES:
-                if name in found:
-                    continue
-                if pattern.search(line):
-                    found[name] = Hazard(
-                        name=name,
-                        category=category,
-                        severity=severity,
-                        detail=line[1:].strip()[:160],
-                    )
-
+            start = match.start()
+            line_start = blob.rfind("\n", 0, start) + 1
+            line_end = blob.find("\n", match.end())
+            snippet = blob[line_start : line_end if line_end != -1 else len(blob)]
+            found[name] = Hazard(
+                name=name,
+                category=category,
+                severity=severity,
+                detail=snippet.lstrip("+-").strip()[:160],
+            )
         return list(found.values())
 
     def pcd_names(self, diff_text: str) -> list[str]:
         names: set[str] = set()
-        for line in _changed_lines(diff_text):
-            for match in _PCD_RE.finditer(line):
-                names.add(match.group(1))
+        for match in _PCD_RE.finditer(_changed_blob(diff_text)):
+            names.add(match.group(1))
         return sorted(names)
 
     def protocol_hits(self, diff_text: str) -> list[str]:
         hits: set[str] = set()
-        for line in _changed_lines(diff_text):
-            for match in _PROTOCOL_RE.finditer(line):
-                hits.add(match.group(1))
+        for match in _PROTOCOL_RE.finditer(_changed_blob(diff_text)):
+            hits.add(match.group(1))
         return sorted(hits)
 
     def boot_api_hits(self, diff_text: str) -> list[str]:
         hits: set[str] = set()
-        for line in _changed_lines(diff_text):
-            for match in _BOOT_API_RE.finditer(line):
-                hits.add(match.group(1))
+        for match in _BOOT_API_RE.finditer(_changed_blob(diff_text)):
+            hits.add(match.group(1))
         return sorted(hits)
 
     def comment_only(self, diff_text: str) -> bool:
@@ -263,3 +260,7 @@ def _changed_lines(diff_text: str):
             continue
         if line.startswith("+") or line.startswith("-"):
             yield line
+
+
+def _changed_blob(diff_text: str) -> str:
+    return "\n".join(_changed_lines(diff_text))

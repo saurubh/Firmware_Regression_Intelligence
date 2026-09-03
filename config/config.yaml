@@ -9,10 +9,11 @@ analysis:
 
 git:
   list_timeout_sec: 180
-  diff_timeout_sec: 15
+  diff_timeout_sec: 8
   path_timeout_sec: 20
-  max_source_paths: 120
-  max_diff_bytes: 1000000
+  max_source_paths: 40
+  max_diff_bytes: 65536
+  skip_merge_diffs: true
 
 report:
   top_candidates: 10

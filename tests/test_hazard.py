@@ -38,3 +38,16 @@ def test_comment_only_diff():
 """
     evidence = DiffAnalyzer().analyze(diff)
     assert evidence.comment_only is True
+
+
+def test_large_diff_analyzes_in_under_two_seconds():
+    import time
+
+    line = "+  Status = HelperFunction(ImageHandle);\n"
+    blob = "+++ b/MdeModulePkg/BdsDxe/BdsEntry.c\n" + (line * 25000)
+    started = time.perf_counter()
+    evidence = DiffAnalyzer().analyze(blob)
+    elapsed = time.perf_counter() - started
+    assert evidence.added_lines == 25000
+    assert elapsed < 2.0, elapsed
+

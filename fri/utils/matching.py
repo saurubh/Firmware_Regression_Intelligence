@@ -8,11 +8,65 @@ Raw substring matching over-classifies as the domain list grows
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 
 def compact_token(text: str) -> str:
     """SECURE BOOT, SecureBoot, and SECUREBOOT all become SECUREBOOT."""
     return re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+
+
+class KeywordIndex:
+    """Find catalog keywords in a blob without compiling a regex per line."""
+
+    def __init__(self, keywords: Iterable[str]) -> None:
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for keyword in keywords:
+            if not keyword or keyword in seen:
+                continue
+            seen.add(keyword)
+            ordered.append(keyword)
+        self.keywords = ordered
+        self._word_re = None
+        if ordered:
+            alts = sorted(ordered, key=len, reverse=True)
+            self._word_re = re.compile(
+                r"(?<![A-Za-z0-9])("
+                + "|".join(re.escape(item) for item in alts)
+                + r")(?![A-Za-z0-9])",
+                re.IGNORECASE,
+            )
+        self._compact: list[tuple[str, str]] = []
+        self._compact_short: list[tuple[str, re.Pattern[str]]] = []
+        for keyword in ordered:
+            compact = compact_token(keyword)
+            if len(compact) >= 6:
+                self._compact.append((keyword, compact))
+            elif len(compact) >= 3:
+                self._compact_short.append(
+                    (
+                        keyword,
+                        re.compile(rf"(?<![A-Z0-9]){re.escape(compact)}(?![A-Z0-9])"),
+                    )
+                )
+
+    def find(self, text: str) -> set[str]:
+        if not text or not self.keywords:
+            return set()
+        hits: set[str] = set()
+        if self._word_re:
+            for match in self._word_re.finditer(text):
+                hits.add(match.group(1))
+        compact = compact_token(text)
+        for keyword, needle in self._compact:
+            if needle in compact:
+                hits.add(keyword)
+        if compact:
+            for keyword, pattern in self._compact_short:
+                if pattern.search(compact):
+                    hits.add(keyword)
+        return hits
 
 
 def keyword_in_text(text: str, keyword: str) -> bool:
