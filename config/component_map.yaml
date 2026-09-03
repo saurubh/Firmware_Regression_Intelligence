@@ -1,0 +1,26 @@
+Platform:
+  - Lenovo/Platform
+  - PlatformPkg
+
+Memory:
+  - Memory
+  - Mrc
+
+FIT:
+  - fit
+
+Security:
+  - SecureBoot
+  - TPM
+
+PCIe:
+  - PCIe
+  - Pcie
+
+Network:
+  - PXE
+  - Network
+
+Storage:
+  - NVMe
+  - Storage

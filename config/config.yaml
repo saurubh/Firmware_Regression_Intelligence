@@ -1,0 +1,10 @@
+debug: false
+
+analysis:
+  minimum_confidence: 25
+
+report:
+  top_candidates: 10
+
+html:
+  theme: light

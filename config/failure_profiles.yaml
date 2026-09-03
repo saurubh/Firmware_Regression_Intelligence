@@ -1,0 +1,29 @@
+boot:
+  subsystems:
+    - Platform
+    - FIT
+    - Security
+
+memory:
+  subsystems:
+    - Memory
+
+pcie:
+  subsystems:
+    - PCIe
+
+network:
+  subsystems:
+    - Network
+
+storage:
+  subsystems:
+    - Storage
+
+security:
+  subsystems:
+    - Security
+
+power:
+  subsystems:
+    - Platform

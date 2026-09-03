@@ -1,0 +1,2 @@
+[console_scripts]
+fri = fri.main:main

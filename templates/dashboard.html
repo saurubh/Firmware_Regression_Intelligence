@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Firmware Regression Intelligence</title>
+
+<style>
+
+:root{
+
+    --bg:#edf2f7;
+    --card:#ffffff;
+    --header:#1f2937;
+    --primary:#2563eb;
+    --success:#16a34a;
+    --warning:#d97706;
+    --danger:#dc2626;
+    --muted:#6b7280;
+    --border:#d1d5db;
+    --shadow:0 4px 10px rgba(0,0,0,.08);
+    --radius:10px;
+
+}
+
+*{
+
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+
+}
+
+body{
+
+    background:var(--bg);
+    font-family:Segoe UI,Arial,sans-serif;
+    color:#111827;
+    padding:30px;
+
+}
+
+.container{
+
+    max-width:1500px;
+    margin:auto;
+
+}
+
+.header{
+
+    background:var(--header);
+    color:white;
+    padding:30px;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+
+}
+
+.header h1{
+
+    font-size:34px;
+    margin-bottom:10px;
+
+}
+
+.subtitle{
+
+    color:#cbd5e1;
+    margin-bottom:25px;
+
+}
+
+.info-grid{
+
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+
+}
+
+.info-card{
+
+    background:#273449;
+    padding:18px;
+    border-radius:8px;
+
+}
+
+.info-title{
+
+    color:#cbd5e1;
+    font-size:13px;
+
+}
+
+.info-value{
+
+    margin-top:8px;
+    font-size:18px;
+    font-weight:bold;
+
+}
+
+.section{
+
+    margin-top:35px;
+
+}
+
+.section h2{
+
+    margin-bottom:20px;
+
+}
+
+.cards{
+
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+
+}
+
+.stat{
+
+    background:white;
+    border-radius:10px;
+    padding:20px;
+    box-shadow:var(--shadow);
+
+}
+
+.stat-title{
+
+    color:var(--muted);
+    font-size:14px;
+
+}
+
+.stat-value{
+
+    font-size:36px;
+    margin-top:10px;
+    color:var(--primary);
+    font-weight:bold;
+
+}
+
+.module-card{
+
+    background:white;
+    border-radius:10px;
+    padding:20px;
+    box-shadow:var(--shadow);
+    margin-bottom:20px;
+
+}
+
+.module-header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+}
+
+.module-name{
+
+    font-size:22px;
+    font-weight:bold;
+
+}
+
+.progress{
+
+    margin-top:18px;
+    margin-bottom:18px;
+    background:#e5e7eb;
+    height:12px;
+    border-radius:20px;
+
+}
+
+.bar{
+
+    height:12px;
+    border-radius:20px;
+    background:var(--primary);
+
+}
+
+.module-footer{
+
+    display:flex;
+    justify-content:space-between;
+    color:var(--muted);
+
+}
+
+.candidate{
+
+    background:white;
+    border-radius:10px;
+    padding:25px;
+    box-shadow:var(--shadow);
+    margin-bottom:25px;
+
+}
+
+.candidate-header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+}
+
+.rank{
+
+    width:45px;
+    height:45px;
+    border-radius:50%;
+    background:var(--primary);
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-weight:bold;
+    font-size:20px;
+
+}
+
+.commit{
+
+    font-size:24px;
+    font-weight:bold;
+
+}
+
+.details{
+
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:18px;
+    margin-top:25px;
+
+}
+
+.detail{
+
+    background:#f8fafc;
+    padding:15px;
+    border-radius:8px;
+
+}
+
+.detail-title{
+
+    color:var(--muted);
+    font-size:13px;
+
+}
+
+.detail-value{
+
+    margin-top:8px;
+    font-weight:bold;
+
+}
+
+.evidence{
+
+    margin-top:25px;
+
+}
+
+.evidence ul{
+
+    margin-left:20px;
+    margin-top:10px;
+
+}
+
+.evidence li{
+
+    margin-bottom:6px;
+
+}
+
+.footer{
+
+    text-align:center;
+    margin-top:50px;
+    color:var(--muted);
+
+}
+
+@media(max-width:1200px){
+
+.info-grid,
+.cards,
+.details{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+}
+
+@media(max-width:768px){
+
+.info-grid,
+.cards,
+.details{
+
+grid-template-columns:1fr;
+
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+
+<h1>Firmware Regression Intelligence</h1>
+
+<div class="subtitle">
+
+Firmware Regression Investigation Dashboard
+
+</div>
+
+<div class="info-grid">
+
+<div class="info-card">
+
+<div class="info-title">
+
+Good Build
+
+</div>
+
+<div class="info-value">
+
+{{ report.good_sha }}
+
+</div>
+
+</div>
+
+<div class="info-card">
+
+<div class="info-title">
+
+Bad Build
+
+</div>
+
+<div class="info-value">
+
+{{ report.bad_sha }}
+
+</div>
+
+</div>
+
+<div class="info-card">
+
+<div class="info-title">
+
+Failure
+
+</div>
+
+<div class="info-value">
+
+{{ report.failure }}
+
+</div>
+
+</div>
+
+<div class="info-card">
+
+<div class="info-title">
+
+Generated
+
+</div>
+
+<div class="info-value">
+
+{{ generated.strftime("%Y-%m-%d %H:%M:%S") }}
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h2>Investigation Summary</h2>
+
+<div class="cards">
+
+<div class="stat">
+
+<div class="stat-title">
+
+Commits Analyzed
+
+</div>
+
+<div class="stat-value">
+
+{{ report.commits|length }}
+
+</div>
+
+</div>
+
+<div class="stat">
+
+<div class="stat-title">
+
+Candidate Commits
+
+</div>
+
+<div class="stat-value">
+
+{{ report.candidates|length }}
+
+</div>
+
+</div>
+
+<div class="stat">
+
+<div class="stat-title">
+
+Firmware Modules
+
+</div>
+
+<div class="stat-value">
+
+{{ report.modules|length }}
+
+</div>
+
+</div>
+
+<div class="stat">
+
+<div class="stat-title">
+
+Investigation
+
+</div>
+
+<div class="stat-value">
+
+Complete
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+<!-- ===================================================== -->
+<!-- Top Firmware Modules -->
+<!-- ===================================================== -->
+
+<div class="section">
+
+<h2>Top Firmware Modules</h2>
+
+{% if report.modules %}
+
+{% for module in report.modules %}
+
+<div class="module-card">
+
+<div class="module-header">
+
+<div>
+
+<div class="module-name">
+
+{{ module.name }}
+
+</div>
+
+<div style="color:var(--muted);margin-top:6px;">
+
+{{ module.commits|length }} Commit(s)
+
+{% if module.jiras %}
+
+&nbsp; • &nbsp;
+
+{{ module.jiras|length }} Jira Issue(s)
+
+{% endif %}
+
+</div>
+
+</div>
+
+<div style="font-size:28px;font-weight:bold;">
+
+{{ module.confidence }}%
+
+</div>
+
+</div>
+
+<div class="progress">
+
+<div
+class="bar"
+style="width:{{ module.confidence }}%">
+</div>
+
+</div>
+
+<div class="module-footer">
+
+<div>
+
+<strong>Authors</strong><br>
+
+{% if module.authors %}
+
+{{ module.authors|join(", ") }}
+
+{% else %}
+
+-
+
+{% endif %}
+
+</div>
+
+<div>
+
+<strong>Jira</strong><br>
+
+{% if module.jiras %}
+
+{{ module.jiras|join(", ") }}
+
+{% else %}
+
+-
+
+{% endif %}
+
+</div>
+
+</div>
+
+{% if module.reasons %}
+
+<div class="evidence">
+
+<h3>Why this module?</h3>
+
+<ul>
+
+{% for reason in module.reasons %}
+
+<li>{{ reason }}</li>
+
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+{% else %}
+
+<div class="module-card">
+
+No affected firmware modules found.
+
+</div>
+
+{% endif %}
+
+</div>
+
+<!-- ===================================================== -->
+<!-- Regression Candidates -->
+<!-- ===================================================== -->
+
+<div class="section">
+
+<h2>Top Regression Candidates</h2>
+
+{% if report.candidates %}
+
+{% for candidate in report.candidates %}
+
+<div class="candidate">
+
+<div class="candidate-header">
+
+<div style="display:flex;align-items:center;gap:20px;">
+
+<div class="rank">
+
+{{ loop.index }}
+
+</div>
+
+<div>
+
+<div class="commit">
+
+{{ candidate.commit.short_sha }}
+
+</div>
+
+<div style="margin-top:6px;color:var(--muted);">
+
+{{ candidate.commit.message }}
+
+</div>
+
+</div>
+
+</div>
+
+<div>
+
+{% if candidate.confidence >= 80 %}
+
+<div
+style="
+font-size:28px;
+font-weight:bold;
+color:var(--success);
+">
+
+{{ candidate.confidence }}%
+
+</div>
+
+{% elif candidate.confidence >= 60 %}
+
+<div
+style="
+font-size:28px;
+font-weight:bold;
+color:var(--warning);
+">
+
+{{ candidate.confidence }}%
+
+</div>
+
+{% else %}
+
+<div
+style="
+font-size:28px;
+font-weight:bold;
+color:var(--danger);
+">
+
+{{ candidate.confidence }}%
+
+</div>
+
+{% endif %}
+
+</div>
+
+</div>
+
+<div class="details">
+
+<div class="detail">
+
+<div class="detail-title">
+
+Author
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.author }}
+
+</div>
+
+</div>
+
+<div class="detail">
+
+<div class="detail-title">
+
+Jira
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.jira or "-" }}
+
+</div>
+
+</div>
+
+<div class="detail">
+
+<div class="detail-title">
+
+Intent
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.intent }}
+
+</div>
+
+</div>
+
+<div class="detail">
+
+<div class="detail-title">
+
+Primary Domain
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.primary_domain }}
+
+</div>
+
+</div>
+
+<div class="detail">
+
+<div class="detail-title">
+
+Files Changed
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.files|length }}
+
+</div>
+
+</div>
+
+</div>
+
+{% if candidate.matched_domains %}
+
+<div class="evidence">
+
+<h3>Matched Firmware Domains</h3>
+
+<ul>
+
+{% for domain in candidate.matched_domains %}
+
+<li>{{ domain }}</li>
+
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% endif %}
+
+{% if candidate.evidence %}
+
+<div class="evidence">
+
+<h3>Evidence</h3>
+
+<ul>
+
+{% for item in candidate.evidence %}
+
+<li>{{ item }}</li>
+
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% endif %}
+
+{% if candidate.reasons %}
+
+<div class="evidence">
+
+<h3>Why FRI Selected This Commit</h3>
+
+<ul>
+
+{% for reason in candidate.reasons %}
+
+<li>{{ reason }}</li>
+
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+{% else %}
+
+<div class="candidate">
+
+No regression candidates identified.
+
+</div>
+
+{% endif %}
+
+</div>
+
+<div class="footer">
+
+Firmware Regression Intelligence (FRI)<br>
+
+Generated {{ generated.strftime("%Y-%m-%d %H:%M:%S") }}
+
+</div>
+
+</div>
+
+</body>
+
+</html>

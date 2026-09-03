@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+
+venv/
+.env/
+
+logs/
+output/
+
+.idea/
+.vscode/
+
+*.swp
