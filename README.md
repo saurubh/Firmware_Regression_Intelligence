@@ -1,164 +1,764 @@
 # Firmware Regression Intelligence (FRI)
 
-Firmware Regression Intelligence (FRI) is an intelligent firmware regression analysis framework that helps BIOS and firmware engineers identify the most probable commits responsible for regressions between a known-good and a known-bad build.
+> FRI automatically analyzes the commits between a known-good and known-bad firmware build and intelligently prioritizes the commits and firmware modules most likely responsible for a regression.
 
-Instead of manually reviewing hundreds of commits, FRI combines Git history, commit metadata, firmware-aware classification, diff analysis, and configurable failure profiles to rank the most likely regression candidates.
-
----
-
-# Features
-
-- Analyze firmware **and OS boot** regressions between two Git revisions
-- 36 failure profiles (SEC/PEI/DXE/BDS boot, Linux/Windows/LinuxBoot handoff, ACPI, IOMMU, memory, PCIe, CXL, Secure Boot, SMM, BMC, FSP, and more)
-- Parse firmware commit metadata (Jira, Merge Requests, intent)
-- Firmware-aware subsystem classification from paths **and** commit keywords
-- Diff analysis with hazard detection (ExitBootServices, PCD/UPD, ACPI tables, IOMMU, timeouts)
-- Multi-signal candidate scoring (domain, path, keyword, hazard, boot API)
-- Module-level aggregation
-- Interactive HTML dashboard
-- JSON export for automation and CI
-- Git bisect recommendations
-- Extensible YAML-based configuration
+An intelligent firmware regression investigation framework that analyzes Git commit history, firmware domains, code changes, and failure profiles to identify the commits and firmware modules most likely responsible for a regression.
 
 ---
 
-# Project Architecture
+# Overview
 
+Firmware regression investigation can be time-consuming, especially when a regression occurs between two builds containing multiple commits.
+
+Engineers typically need to:
+
+- Identify the known good build
+- Identify the known bad build
+- Review all commits between the builds
+- Analyze commit messages
+- Check Jira references
+- Review modified files
+- Analyze code changes
+- Identify affected firmware modules
+- Prioritize suspicious commits
+- Perform manual debugging or Git bisect
+
+**Firmware Regression Intelligence (FRI)** automates the initial investigation and helps engineers quickly identify the most likely regression candidates.
+
+FRI combines:
+
+- Git commit metadata
+- Commit messages
+- Jira references
+- Firmware domain classification
+- Failure profiles (firmware boot **and** OS boot / OS handoff)
+- Diff analysis and high-risk hazard detection
+- Firmware keywords and path patterns
+- Change size
+- Commit intent
+- Merge commit information
+
+The result is a ranked list of potential regression commits along with supporting evidence and affected firmware modules.
+
+---
+
+# Problem Statement
+
+Consider the following scenario:
+
+```text
+Known Good Build
+       |
+       |  Multiple commits
+       |
+       v
+Known Bad Build
 ```
-CLI
- ¦
- ?
-Investigation Engine
- ¦
- +-- Git Collector
- +-- Commit Parser
- +-- Firmware Classifier
- +-- Diff Analyzer
- +-- Regression Scorer
- +-- Candidate Engine
- +-- Module Analyzer
- ¦
- ?
-Regression Report
- ¦
- +-- Console Report
- +-- HTML Report
- +-- JSON Report
+
+A regression is detected, for example:
+
+```text
+Boot Failure
+OS Boot Failure (Linux / Windows / LinuxBoot)
 ```
+
+The engineer must determine:
+
+> Which commit introduced the regression?
+
+Traditionally, this requires manually investigating every commit between the good and bad builds.
+
+FRI helps reduce this investigation effort by automatically ranking commits based on firmware-aware evidence.
+
+---
+
+# How FRI Works
+
+```text
+                 User Input
+                     |
+                     v
+          +---------------------+
+          | Good Build / SHA    |
+          | Bad Build / SHA     |
+          | Failure Type        |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Investigation Engine|
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Git Collector       |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Commit Parser       |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Firmware Classifier |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Diff Analyzer       |
+          | Hazard Detector     |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Candidate Engine    |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Regression Scoring  |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Module Analyzer     |
+          | Bisect Planner      |
+          +---------------------+
+                     |
+                     v
+          +---------------------+
+          | Reports             |
+          | Console             |
+          | HTML                |
+          | JSON                |
+          +---------------------+
+```
+
+---
+
+# Architecture
+
+The project is organized into independent layers.
+
+```text
+fri/
+│
+├── analyzer/
+│   ├── bisect_planner.py
+│   ├── candidate_engine.py
+│   ├── diff_analyzer.py
+│   ├── hazard_detector.py
+│   └── module_analyzer.py
+│
+├── classifier/
+│   └── classifier.py
+│
+├── collector/
+│   ├── build_resolver.py
+│   └── git_collector.py
+│
+├── engine/
+│   └── investigation_engine.py
+│
+├── parser/
+│   └── commit_parser.py
+│
+├── report/
+│   ├── console_report.py
+│   ├── html_report.py
+│   └── json_report.py
+│
+├── scorer/
+│   └── regression_scorer.py
+│
+├── utils/
+│   └── helpers.py
+│
+├── cli.py
+├── config.py
+├── constants.py
+├── logger.py
+├── main.py
+└── models.py
+```
+
+Configuration lives under `config/`. HTML templates live under `templates/`.
+
+---
+
+# Key Components
+
+## Investigation Engine
+
+The `InvestigationEngine` orchestrates the complete regression investigation.
+
+It coordinates:
+
+- Git collection
+- Commit parsing
+- Firmware classification
+- Diff analysis
+- Candidate evaluation
+- Candidate ranking
+- Module aggregation
+- Bisect / validation planning
+
+The engine itself does not contain firmware-specific analysis logic.
+
+---
+
+## Git Collector
+
+The Git Collector communicates with the firmware Git repository.
+
+It is responsible for:
+
+- Opening the repository
+- Resolving Git references
+- Resolving short SHA values
+- Resolving `HEAD`
+- Collecting commits between two builds
+- Retrieving commit diffs
+
+Example:
+
+```text
+Good Build : 13b5128
+Bad Build  : HEAD
+```
+
+FRI resolves these references and collects all commits in the regression range.
+
+---
+
+## Commit Parser
+
+The Commit Parser extracts useful metadata from commit messages.
+
+It can identify information such as:
+
+- Jira IDs
+- Merge references
+- Commit intent
+- Firmware feature keywords
+
+Examples of commit intent include:
+
+```text
+Fix
+Revert
+Enable
+Disable
+Hang
+Unknown
+```
+
+---
+
+## Firmware Classifier
+
+The Firmware Classifier maps commits and modified files to firmware domains using `config/component_map.yaml` and commit keywords.
+
+Example domains include:
+
+```text
+Platform
+FIT
+Memory
+PCIe
+Storage
+Network
+Security
+Power
+Boot
+PEI
+DXE
+BDS
+ACPI
+OSLoader
+LinuxBoot
+IOMMU
+```
+
+A commit may belong to multiple domains.
+
+Example:
+
+```text
+Primary Domain : FIT
+
+Domains :
+FIT
+Platform
+```
+
+---
+
+## Diff Analyzer and Hazard Detector
+
+The Diff Analyzer examines the actual code changes associated with a commit.
+
+It identifies firmware-related evidence such as:
+
+- Firmware keywords
+- Modified files, functions, and macros
+- PCD / UPD symbols
+- Protocol / PPI GUIDs
+- Boot-services APIs
+- Diff complexity
+
+The Hazard Detector looks for high-risk change patterns that commonly *cause* regressions, for example:
+
+```text
+ExitBootServices
+GetMemoryMap
+SetVirtualAddressMap
+ACPI tables (DSDT, MADT, SRAT, DMAR, …)
+IOMMU / VT-d
+PCD / UPD defaults
+Timeouts / stalls
+Secure Boot policy
+TPM / PCR
+SMM / SMI
+```
+
+This provides additional evidence beyond commit messages.
+
+---
+
+## Candidate Engine
+
+The Candidate Engine combines:
+
+```text
+Commit Metadata
+       +
+Firmware Classification
+       +
+Failure Profile
+       +
+Diff Evidence
+       +
+Hazards
+       |
+       v
+Regression Candidate
+```
+
+Each commit is converted into a `RegressionCandidate`.
+
+The candidate contains:
+
+- Confidence score
+- Evidence
+- Matching domains
+- Matching files and paths
+- Firmware keywords
+- Hazards
+- Reasons for ranking
+
+---
+
+# Regression Scoring
+
+FRI uses a rule-based, multi-signal scoring system to prioritize suspicious commits.
+
+The score is generated using independent signals so a small but precise OS-boot change can outrank a large unrelated edit.
+
+Examples include:
+
+| Evidence | Example |
+| --- | --- |
+| Failure profile match | Boot / OS-boot failure + relevant firmware domain |
+| Path pattern match | `BdsDxe`, `LinuxBoot`, `AcpiTable`, `IntelVTd` |
+| Profile keywords | ExitBootServices, FIT, PEI, DDR, PCD, IOMMU |
+| High-risk hazards | ExitBootServices, PCD/UPD default, ACPI table, VT-d |
+| Boot / OS-handoff APIs | `gBS->ExitBootServices`, `GetMemoryMap` |
+| Commit intent | Fix, Revert, Enable, Disable, Hang |
+| Merge commit | Commit contains multiple integrated changes |
+| Jira reference | Associated tracked issue |
+| Change size | Large or medium code modification |
+| Diff complexity | Complexity of the code changes |
+| Noise reduction | Documentation-only and comment-only diffs are down-ranked |
+
+The final confidence score is limited to:
+
+```text
+0% - 100%
+```
+
+FRI does not claim that the highest-ranked commit is automatically the root cause.
+
+Instead, it provides an **intelligent investigation starting point**.
+
+---
+
+# Example Candidate
+
+```text
+[1] 70e2e4be
+
+Confidence : 99%
+
+Author     : Saurabh Mishra
+
+Jira       : UEFIRM-78402
+
+Intent     : Unknown
+
+Domain     : FIT
+
+Domains    : FIT, Platform
+```
+
+Evidence:
+
+```text
+✓ Firmware keyword: FIT
+✓ Firmware keyword: PLATFORM
+✓ Merge commit
+✓ Jira UEFIRM-78402
+✓ Medium code change
+```
+
+OS-boot example:
+
+```text
+[1] 9f9435c4
+
+Confidence : 100%
+
+Subject    : BIOS-42: Linux OS boot hangs in ExitBootServices
+
+Domain     : BDS
+
+Hazards    : HIGH hazard: ExitBootServices
+```
+
+---
+
+# Module Analysis
+
+FRI also aggregates regression candidates into firmware modules.
+
+Instead of only answering:
+
+> Which commit is suspicious?
+
+FRI also answers:
+
+> Which firmware area is most likely affected?
+
+Example:
+
+```text
+MOST AFFECTED MODULES
+
+FIT                  94%
+   Commits : 4
+   Jira    : UEFIRM-78402
+
+Platform             78%
+   Commits : 8
+   Jira    : UEFIRM-78140, UEFIRM-78324, UEFIRM-78402
+```
+
+This is useful because firmware development and debugging are often organized around module ownership.
+
+---
+
+# Supported Failure Types
+
+Use `fri topics` to list every profile. Built-in `--failure` values include:
+
+```text
+boot            Firmware boot (SEC / PEI / DXE / BDS / FSP / FIT)
+os_boot         OS handoff: ExitBootServices, memory map, ACPI, GRUB,
+                Linux, Windows bootmgr, LinuxBoot
+linuxboot       LinuxBoot / u-root / kexec payload
+acpi            DSDT / SSDT / MADT / SRAT / DMAR and related tables
+iommu           VT-d / AMD-Vi / DMAR programming
+memory          MRC / FSP memory init, DIMM, NUMA
+pcie            Link training, BARs, resource allocation
+network         PXE, HTTP boot, UNDI/SNP
+storage         NVMe, SATA, RAID, boot disk
+security        Secure Boot, Boot Guard, authenticated variables
+secure_boot     OS loader verification, shim, db/dbx
+measured_boot   TCG event log / PCR policy
+tpm             TPM 2.0 device and measurements
+smm             SMM / SMI / SMRAM
+variable        NVRAM, BootOrder, FTW
+capsule         Capsule / ESRT / FMP update
+cpu             MP init, microcode, MADT topology
+numa            SRAT / SLIT / HMAT / SNC
+cxl             CXL device and HDM decoder
+ras             MCE / AER / firmware-first RAS
+graphics        GOP / console / framebuffer handoff
+serial          UART / SOL / earlyprintk
+usb             USB host and USB boot
+csm             Legacy BIOS / option ROM boot
+bmc / ipmi / me Out-of-band manageability
+watchdog        TCO / WDT reboot during boot
+thermal / gpio / power / resume
+smbios / fit / fsp
+generic         Unknown failure class
+```
+
+Example:
+
+```bash
+--failure boot
+--failure os_boot
+```
+
+The failure type influences how commits are evaluated and ranked.
+
+Additional domains and topics can be added through `config/failure_profiles.yaml` and `config/component_map.yaml`.
 
 ---
 
 # Installation
 
-Clone the repository:
+## Prerequisites
+
+FRI requires:
+
+```text
+Python 3.10 or newer
+Git
+```
+
+---
+
+## Clone or Navigate to the Project
 
 ```bash
 git clone <repository-url>
-
-cd fri
+cd Firmware_Regression_Intelligence
 ```
 
-Create the development environment:
+---
+
+## Create a Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Or use the project setup script:
 
 ```bash
 ./setup.sh
 ```
 
-Or install manually:
+---
+
+## Install FRI
+
+Install the project in editable mode:
 
 ```bash
-python3 -m venv venv
-
-source venv/bin/activate
-
 pip install -e .
+```
 
+Development extras:
+
+```bash
 pip install -e ".[dev]"
 ```
 
----
-
-# Verify Installation
+Verify installation:
 
 ```bash
 fri --help
-```
-
-Expected output:
-
-```text
-Firmware Regression Intelligence
-
-Commands
-
-    investigate
-
-    doctor
-
-    config
-
-    topics
-```
-
-List every regression topic:
-
-```bash
+fri doctor
 fri topics
 ```
 
 ---
 
-# Basic Usage
+# Quick Start
 
-Investigate a firmware-to-OS boot regression (Linux, Windows, LinuxBoot, GRUB, EFI stub):
+Firmware / BIOS boot regression:
 
 ```bash
 fri investigate \
-    --repo ~/firmware-repo \
-    --good GOOD_SHA \
-    --bad BAD_SHA \
-    --failure os_boot
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
+    --failure boot \
+    --html \
+    --json
 ```
 
-Investigate a firmware/BIOS boot regression:
+OS boot / firmware-to-OS handoff regression (Linux, Windows, LinuxBoot, GRUB, EFI stub):
 
 ```bash
 fri investigate \
-    --repo ~/firmware-repo \
-    --good GOOD_SHA \
-    --bad BAD_SHA \
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
+    --failure os_boot \
+    --html \
+    --json
+```
+
+---
+
+# Command Line Arguments
+
+## Repository
+
+```bash
+--repo
+```
+
+Path to the firmware Git repository.
+
+Example:
+
+```bash
+--repo ~/BHS_2026/birchstream-rv
+```
+
+---
+
+## Good Build
+
+```bash
+--good
+```
+
+Known working commit or build SHA.
+
+Example:
+
+```bash
+--good 13b5128
+```
+
+---
+
+## Bad Build
+
+```bash
+--bad
+```
+
+Known failing commit or build SHA.
+
+Example:
+
+```bash
+--bad HEAD
+```
+
+---
+
+## Failure Type
+
+```bash
+--failure
+```
+
+Regression failure category.
+
+Example:
+
+```bash
+--failure boot
+--failure os_boot
+```
+
+---
+
+## HTML Report
+
+```bash
+--html
+```
+
+Generates:
+
+```text
+output/report.html
+```
+
+---
+
+## JSON Report
+
+```bash
+--json
+```
+
+Generates:
+
+```text
+output/report.json
+```
+
+---
+
+## Top Candidates
+
+```bash
+--top 10
+```
+
+Limits how many ranked candidates are shown in reports.
+
+---
+
+# Example Commands
+
+## Console Investigation
+
+```bash
+fri investigate \
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
     --failure boot
 ```
 
-Generate an HTML dashboard:
+---
+
+## Generate HTML Report
 
 ```bash
 fri investigate \
-    --repo ~/firmware-repo \
-    --good GOOD_SHA \
-    --bad BAD_SHA \
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
     --failure boot \
     --html
 ```
 
-Generate a JSON report:
+---
+
+## Generate JSON Report
 
 ```bash
 fri investigate \
-    --repo ~/firmware-repo \
-    --good GOOD_SHA \
-    --bad BAD_SHA \
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
     --failure boot \
     --json
 ```
 
-Generate both reports:
+---
+
+## Generate Both Reports
 
 ```bash
 fri investigate \
-    --repo ~/firmware-repo \
-    --good GOOD_SHA \
-    --bad BAD_SHA \
+    --repo ~/BHS_2026/birchstream-rv \
+    --good 13b5128 \
+    --bad HEAD \
     --failure boot \
     --html \
     --json
@@ -166,146 +766,444 @@ fri investigate \
 
 ---
 
-# Example Workflow
+## List All Regression Topics
 
-```
-Known Good Build
-        ¦
-        ?
-Known Bad Build
-        ¦
-        ?
-Collect Commits
-        ¦
-        ?
-Parse Metadata
-        ¦
-        ?
-Classify Firmware Domains
-        ¦
-        ?
-Analyze Git Diffs
-        ¦
-        ?
-Score Regression Candidates
-        ¦
-        ?
-Aggregate Firmware Modules
-        ¦
-        ?
-Generate Reports
+```bash
+fri topics
 ```
 
 ---
 
 # Output
 
-FRI can generate:
+FRI supports three report formats.
 
-- Console summary
-- HTML dashboard
-- JSON report
+## Console Report
 
-The HTML dashboard includes:
+Provides immediate investigation results in the terminal.
+
+Includes:
+
+- Ranked regression candidates
+- Confidence scores
+- Authors
+- Jira IDs
+- Commit intent
+- Firmware domains
+- Hazards and evidence
+- Affected modules
+- Git bisect commands
+- Covered regression topics
+
+---
+
+## HTML Report
+
+Generated at:
+
+```text
+output/report.html
+```
+
+The HTML dashboard provides a visual representation of:
 
 - Investigation summary
-- Firmware module ranking
-- Regression candidate ranking
-- Evidence collected
-- Git bisect recommendations
-- Investigation statistics
+- Top firmware modules
+- Confidence levels
+- Regression candidates
+- Commit metadata
+- High-risk hazards
+- Evidence
+- Git bisect plan
+- Covered regression topics
+
+---
+
+## JSON Report
+
+Generated at:
+
+```text
+output/report.json
+```
+
+The JSON report can be used for:
+
+- Automation
+- CI/CD integration
+- External dashboards
+- Future analytics
+- Machine learning pipelines
 
 ---
 
 # Configuration
 
-FRI uses YAML configuration files to customize analysis.
+FRI uses configuration files stored under:
 
-Typical configuration includes:
+```text
+config/
+├── component_map.yaml
+├── config.yaml
+└── failure_profiles.yaml
+```
 
-- Component mapping
-- Failure profiles
-- Scoring rules
-- Firmware domain mappings
+---
+
+## Component Mapping
+
+`component_map.yaml` maps repository components and paths to firmware domains.
+
+Example concept:
+
+```text
+Memory Path
+      ↓
+Memory Domain
+
+PCI Path
+      ↓
+PCIe Domain
+
+FIT Path
+      ↓
+FIT Domain
+
+BdsDxe Path
+      ↓
+BDS Domain
+```
+
+---
+
+## Failure Profiles
+
+`failure_profiles.yaml` defines which firmware domains, keywords, path patterns, and risk signals are relevant to each failure type.
+
+Example concept:
+
+```text
+Boot Failure
+      ↓
+Platform, FIT, PEI, DXE, BDS, FSP
+
+OS Boot Failure
+      ↓
+BDS, ACPI, SMBIOS, OSLoader, LinuxBoot, IOMMU, Variable
+```
+
+This information is used during regression candidate scoring.
 
 ---
 
 # Development
 
-Install development dependencies:
+## Install Development Dependencies
 
 ```bash
-pip install -e ".[dev]"
-```
-
-Useful commands:
-
-```bash
-make format
-
-make lint
-
-make test
-
-make coverage
-
-make build
+make dev
 ```
 
 ---
 
-# Running Tests
+## Format Code
+
+```bash
+make format
+```
+
+This runs:
+
+```text
+black
+ruff
+```
+
+---
+
+## Static Analysis
+
+```bash
+make lint
+```
+
+This runs:
+
+```text
+ruff
+mypy
+```
+
+---
+
+## Run Tests
+
+```bash
+make test
+```
+
+or:
 
 ```bash
 pytest
 ```
 
-Coverage:
+---
+
+## Run Coverage
 
 ```bash
-pytest --cov=fri
+make coverage
 ```
 
 ---
 
-# Supported Regression Topics
+## Run Full Validation
 
-Use `fri topics` or `--failure <name>`. Built-in profiles:
-
-| Topic | What it catches |
-| --- | --- |
-| `boot` | Firmware boot (SEC/PEI/DXE/BDS/FSP/FIT) |
-| `os_boot` | OS handoff: ExitBootServices, memory map, ACPI, GRUB, Linux, Windows bootmgr, LinuxBoot |
-| `linuxboot` | LinuxBoot / u-root / kexec payload |
-| `acpi` | DSDT/SSDT/MADT/SRAT/DMAR and other tables the OS consumes |
-| `iommu` | VT-d / AMD-Vi / DMAR programming that hangs the kernel |
-| `memory` | MRC/FSP memory init, DIMM, NUMA |
-| `pcie` | Link training, BARs, resource allocation |
-| `storage` / `network` | Boot disks, NVMe, PXE, HTTP boot |
-| `security` / `secure_boot` / `measured_boot` / `tpm` | Authenticated boot and PCR/event log |
-| `smm` / `variable` / `capsule` | Runtime, NVRAM, firmware update |
-| `cpu` / `numa` / `cxl` / `ras` | Topology, CXL memory, error handling |
-| `graphics` / `serial` / `usb` / `csm` | Console and legacy boot |
-| `bmc` / `ipmi` / `me` / `watchdog` / `thermal` / `gpio` / `power` / `resume` | Platform manageability and sleep |
-| `smbios` / `fit` / `fsp` | Inventory, Boot Guard, silicon UPD |
-| `generic` | Unknown failure class |
-
-Additional domains can be added through `config/failure_profiles.yaml` and `config/component_map.yaml`.
+```bash
+make ci
+```
 
 ---
 
-# Roadmap
+# Makefile Commands
 
-Future releases will include:
+```text
+make install
+make dev
+make format
+make lint
+make test
+make coverage
+make clean
+make run
+make html
+make json
+make build
+make tree
+make ci
+```
 
-- GitLab integration
-- Jira integration
-- Jenkins integration
-- REST API
-- Machine learning-based scoring
-- Web UI
-- Plugin architecture
-- Regression history database
+Example:
+
+```bash
+make run REPO=~/BHS_2026/birchstream-rv GOOD=13b5128 BAD=HEAD FAILURE=os_boot
+```
+
+---
+
+# Project Goals
+
+The primary goal of FRI is to reduce the time required for firmware regression investigation.
+
+Instead of manually reviewing a large number of commits:
+
+```text
+100 Commits
+     |
+     v
+Manual Investigation
+     |
+     v
+Several Hours / Days
+```
+
+FRI provides:
+
+```text
+100 Commits
+     |
+     v
+Automated Analysis
+     |
+     v
+Top Regression Candidates
+     |
+     v
+Focused Investigation
+```
+
+---
+
+# Important Disclaimer
+
+FRI is an **investigation assistant**.
+
+It does not automatically prove that a commit caused a regression.
+
+The confidence score represents the likelihood that a commit deserves investigation based on available evidence.
+
+The final root cause must still be validated by firmware engineers through:
+
+- Code review
+- Reproduction
+- Debug logs
+- Build testing
+- Git bisect
+- Hardware validation
+
+---
+
+# Future Roadmap
+
+FRI is currently implemented as a Proof of Concept.
+
+Future improvements include:
+
+## Firmware Semantic Analysis
+
+Understand firmware-specific entities such as:
+
+```text
+Functions
+Protocols
+PPIs
+GUIDs
+PCDs
+HOBs
+Libraries
+Drivers
+Packages
+Setup Variables
+ACPI Tables
+```
+
+---
+
+## Firmware Phase Awareness
+
+Automatically identify firmware execution phases:
+
+```text
+SEC
+PEI
+DXE
+BDS
+SMM
+Runtime
+OS Handoff
+```
+
+---
+
+## Firmware Knowledge Base
+
+Build a knowledge base connecting:
+
+```text
+PCD
+   ↓
+Subsystem
+
+Protocol
+   ↓
+Subsystem
+
+Library
+   ↓
+Subsystem
+
+Driver
+   ↓
+Subsystem
+
+Firmware Phase
+```
+
+---
+
+## Improved Regression Scoring
+
+Use semantic firmware evidence instead of relying primarily on keyword matching.
+
+---
+
+## GitLab Integration
+
+Potential integration with:
+
+- Merge Requests
+- Reviewers
+- Labels
+- Pipeline status
+- CI results
+
+---
+
+## Jira Integration
+
+Potential integration with:
+
+- Jira summary
+- Components
+- Priority
+- Labels
+- Related issues
+
+---
+
+## Git Bisect Assistant
+
+Automatically recommend an optimized regression investigation path using Git bisect.
+
+---
+
+## CI/CD Integration
+
+FRI can eventually be integrated into firmware validation pipelines.
+
+Example:
+
+```text
+Regression Detected
+        |
+        v
+FRI Automatically Runs
+        |
+        v
+Top Suspect Commits
+        |
+        v
+Engineer Notification
+```
+
+---
+
+# Vision
+
+The long-term vision of FRI is to build an intelligent firmware investigation assistant that understands both:
+
+```text
+Git History
+```
+
+and
+
+```text
+Firmware Architecture
+```
+
+The goal is to help firmware engineers answer:
+
+> What changed?
+
+> Which firmware module is affected?
+
+> Which commits are most suspicious?
+
+> Why are these commits suspicious?
+
+> Where should investigation begin?
+
+---
+
+# Author
+
+**Saurabh Mishra**
+
+Firmware Engineer | UEFI | BIOS | Firmware Development
+
+Firmware | UEFI | Coreboot | LinuxBoot | Datacenter Infrastructure
 
 ---
 
@@ -315,10 +1213,8 @@ MIT License
 
 ---
 
-# Author
+# Status
 
-**Saurabh Mishra**
+Proof of Concept / Active Development
 
-Firmware Engineer
-
-Firmware | UEFI | Coreboot | LinuxBoot | Datacenter Infrastructure
+FRI is currently under active development and focused on improving the accuracy and intelligence of firmware regression investigation.
