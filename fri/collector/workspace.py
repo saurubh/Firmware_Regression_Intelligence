@@ -189,6 +189,90 @@ class WorkspaceCollector:
             raise RuntimeError("Manifest needs workspace + good + bad, or explicit repos.")
         return self.plan_from_workspace(workspace, good, bad)
 
+    def plan_from_gitman(self, gitman_path: str, good: str, bad: str) -> WorkspacePlan:
+        """Inspect every `sources[].name` folder from gitman.yml for the same tags."""
+        path = Path(gitman_path).expanduser().resolve()
+        if not path.is_file():
+            raise RuntimeError(f"gitman.yml not found: {path}")
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        location = str(raw.get("location") or ".")
+        root = (path.parent / location).resolve()
+        names = []
+        for key in ("sources", "sources_locked"):
+            for item in raw.get(key) or []:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                if name and name not in names:
+                    names.append(name)
+        if not names:
+            raise RuntimeError(f"{path} has no sources[].name entries.")
+        logger.info("gitman.yml: %d source folder(s) under %s", len(names), root)
+
+        entries: list[tuple[str, Path, str]] = []
+        seen: set[str] = set()
+        if _is_git_dir(root):
+            entries.append((root.name or "platform", root, "."))
+            seen.add(str(root))
+        for name in names:
+            repo_dir = (root / name).resolve()
+            key = str(repo_dir)
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append((name, repo_dir, name))
+
+        windows: list[RepoWindow] = []
+        deltas: list[RepoDelta] = []
+        for name, repo_dir, rel in entries:
+            opened = _open_if_git(repo_dir)
+            g_sha, g_src, b_sha, b_src, status = self._pair(
+                opened,
+                good,
+                bad,
+                gitlink_good="",
+                gitlink_bad="",
+                name=name,
+            )
+            if opened is None:
+                status = "missing"
+                g_src = b_src = "missing"
+            logger.info(
+                "  %-22s  %s  via %s/%s",
+                name,
+                status,
+                g_src,
+                b_src,
+            )
+            deltas.append(
+                RepoDelta(
+                    name=name,
+                    path=rel,
+                    good_sha=g_sha,
+                    bad_sha=b_sha,
+                    status=status,
+                    good_source=g_src,
+                    bad_source=b_src,
+                )
+            )
+            if status == "changed" and opened is not None and g_sha and b_sha:
+                windows.append(
+                    RepoWindow(
+                        name=name,
+                        path=str(repo_dir),
+                        good_sha=g_sha,
+                        bad_sha=b_sha,
+                        changed=True,
+                    )
+                )
+        return WorkspacePlan(
+            workspace=str(root),
+            good_label=good,
+            bad_label=bad,
+            windows=windows,
+            deltas=deltas,
+        )
+
     def _pair(
         self,
         repo: Repo | None,
@@ -350,4 +434,19 @@ class WorkspaceCollector:
                 return module
             except Exception:
                 return None
+        return None
+
+
+def _is_git_dir(path: Path) -> bool:
+    try:
+        Repo(str(path))
+        return True
+    except (InvalidGitRepositoryError, Exception):
+        return False
+
+
+def _open_if_git(path: Path) -> Repo | None:
+    try:
+        return Repo(str(path))
+    except (InvalidGitRepositoryError, Exception):
         return None

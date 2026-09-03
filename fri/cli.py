@@ -36,18 +36,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="BIOS superproject with edk2 / Intel / platform submodules",
     )
     source.add_argument(
+        "--gitman",
+        help="gitman.yml: inspect each sources[].name folder for the same --good/--bad tags",
+    )
+    source.add_argument(
         "--manifest",
         help="YAML pin-set listing each repo's good and bad SHA",
     )
     investigate.add_argument(
         "--good",
         help="Known-good BIOS tag, branch or commit. "
-        "With --workspace, this same name is looked up in every sub-repo.",
+        "With --workspace or --gitman, this same name is looked up in every listed repo.",
     )
     investigate.add_argument(
         "--bad",
         help="Known-bad BIOS tag, branch or commit. "
-        "With --workspace, this same name is looked up in every sub-repo.",
+        "With --workspace or --gitman, this same name is looked up in every listed repo.",
     )
     investigate.add_argument(
         "--failure",
@@ -64,7 +68,12 @@ def build_parser() -> argparse.ArgumentParser:
         "pins",
         help="Show which submodules/repos moved between two BIOS builds",
     )
-    pins.add_argument("--workspace", required=True, help="BIOS superproject path")
+    pin_src = pins.add_mutually_exclusive_group(required=True)
+    pin_src.add_argument("--workspace", help="BIOS superproject path")
+    pin_src.add_argument(
+        "--gitman",
+        help="gitman.yml listing Edk2/Intel/Lenovo folders",
+    )
     pins.add_argument(
         "--good",
         required=True,

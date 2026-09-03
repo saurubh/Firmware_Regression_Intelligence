@@ -74,6 +74,13 @@ class InvestigationEngine:
         plan = self.workspace.plan_from_manifest(manifest)
         return self.investigate_plan(plan, failure)
 
+    def investigate_gitman(self, gitman, good, bad, failure) -> RegressionReport:
+        logger.info("Reading sources[].name from gitman.yml and resolving the same tags...")
+        plan = self.workspace.plan_from_gitman(gitman, good, bad)
+        moved = sum(1 for item in plan.deltas if item.status == "changed")
+        logger.info("Pin-set: %d repo(s) moved of %d listed.", moved, len(plan.deltas))
+        return self.investigate_plan(plan, failure)
+
     def investigate_plan(self, plan: WorkspacePlan, failure) -> RegressionReport:
         started = time.perf_counter()
         failure_key = failure.lower()

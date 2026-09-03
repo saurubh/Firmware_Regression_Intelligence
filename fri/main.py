@@ -35,7 +35,12 @@ def main() -> int:
         return _phases()
 
     if args.command == "pins":
-        return _pins(args.workspace, args.good, args.bad)
+        return _pins(
+            workspace=args.workspace,
+            gitman=getattr(args, "gitman", None),
+            good=args.good,
+            bad=args.bad,
+        )
 
     if args.command != "investigate":
         print("Unknown command.")
@@ -46,6 +51,9 @@ def main() -> int:
         return 2
     if args.workspace and (not args.good or not args.bad):
         print("--good and --bad are required with --workspace.")
+        return 2
+    if args.gitman and (not args.good or not args.bad):
+        print("--good and --bad are required with --gitman.")
         return 2
 
     if args.verbose:
@@ -61,6 +69,13 @@ def main() -> int:
         if args.manifest:
             logger.info("Manifest     : %s", args.manifest)
             report = engine.investigate_manifest(args.manifest, args.failure)
+        elif args.gitman:
+            logger.info("gitman.yml   : %s", args.gitman)
+            logger.info("Good Build   : %s", args.good)
+            logger.info("Bad Build    : %s", args.bad)
+            report = engine.investigate_gitman(
+                args.gitman, args.good, args.bad, args.failure
+            )
         elif args.workspace:
             logger.info("Workspace    : %s", args.workspace)
             logger.info("Good Build   : %s", args.good)
@@ -140,10 +155,19 @@ def _phases() -> int:
     return 0
 
 
-def _pins(workspace: str, good: str, bad: str) -> int:
+def _pins(
+    workspace: str | None,
+    good: str,
+    bad: str,
+    gitman: str | None = None,
+) -> int:
     from fri.collector.workspace import WorkspaceCollector
 
-    plan = WorkspaceCollector().plan_from_workspace(workspace, good, bad)
+    collector = WorkspaceCollector()
+    if gitman:
+        plan = collector.plan_from_gitman(gitman, good, bad)
+    else:
+        plan = collector.plan_from_workspace(workspace, good, bad)
     print(f"Workspace : {plan.workspace}")
     print(f"Good      : {plan.good_label}")
     print(f"Bad       : {plan.bad_label}")
@@ -159,10 +183,16 @@ def _pins(workspace: str, good: str, bad: str) -> int:
     moved = [item for item in plan.deltas if item.status == "changed"]
     print()
     print(f"{len(moved)} repo(s) moved. Investigate with:")
-    print(
-        f"  fri investigate --workspace {workspace} "
-        f"--good {good} --bad {bad} --failure from_reset"
-    )
+    if gitman:
+        print(
+            f"  fri investigate --gitman {gitman} "
+            f"--good {good} --bad {bad} --failure from_reset"
+        )
+    else:
+        print(
+            f"  fri investigate --workspace {workspace} "
+            f"--good {good} --bad {bad} --failure from_reset"
+        )
     return 0
 
 

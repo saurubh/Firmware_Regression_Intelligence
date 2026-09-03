@@ -1,0 +1,18 @@
+# gitman.yml layout used by Birch Stream-style trees.
+# FRI reads sources[].name as folders under `location` and looks up
+# the same --good / --bad tag in each Git clone.
+#
+#   fri pins --gitman ./gitman.yml --good GOOD_TAG --bad BAD_TAG
+#   fri investigate --gitman ./gitman.yml --good GOOD_TAG --bad BAD_TAG --failure os_boot
+
+location: .
+
+sources:
+  - name: Edk2
+  - name: Edk2Platforms
+  - name: Intel
+  - name: FDBin
+  - name: Lenovo/Base
+  - name: Lenovo/Generation
+  - name: Lenovo/Tools
+  - name: Lenovo/Server
