@@ -1,29 +1,1155 @@
+# Firmware Regression Intelligence — Failure Profiles
+#
+# Each profile describes one regression topic. The scorer uses
+# subsystems, keywords, path patterns, and risk signals together
+# so that the correct commits rise to the top.
+
 boot:
+  description: >
+    Firmware/BIOS boot from reset through SEC, PEI, DXE, and BDS
+    before the OS loader is started. Covers hang-at-post, no video,
+    missing DXE drivers, and failed ReadyToBoot.
   subsystems:
     - Platform
     - FIT
+    - Boot
+    - PEI
+    - DXE
+    - BDS
+    - FSP
     - Security
+  keywords:
+    - boot
+    - post
+    - pei
+    - dxe
+    - bds
+    - sec
+    - fsp
+    - fit
+    - readytoboot
+    - endofdxe
+    - peim
+    - dxecore
+    - platform
+    - hang
+    - reset
+    - watchdog
+    - timeout
+  path_patterns:
+    - peicore
+    - dxecore
+    - bdsdxe
+    - platformpeim
+    - fspwrapper
+    - intelfsp
+    - fit
+    - secmain
+    - reportstatuscode
+    - dxeiplex
+    - ufeibootmanager
+  risk_signals:
+    - timeout
+    - pcd
+    - default
+    - assert
+    - stall
+    - watchdog
+
+os_boot:
+  description: >
+    OS boot / firmware-to-OS handoff regressions. The firmware
+    reaches BDS but Linux, Windows, LinuxBoot, GRUB, systemd-boot,
+    or the EFI stub fails to start, panics early, or cannot see
+    memory, ACPI, disks, or consoles.
+  subsystems:
+    - Boot
+    - BDS
+    - ACPI
+    - SMBIOS
+    - OSLoader
+    - LinuxBoot
+    - IOMMU
+    - Memory
+    - PCIe
+    - Variable
+    - Graphics
+    - Network
+    - Storage
+  keywords:
+    - os boot
+    - osboot
+    - exitbootservices
+    - getmemorymap
+    - loadimage
+    - startimage
+    - bootmanager
+    - bootorder
+    - boot####
+    - grub
+    - linux
+    - linuxboot
+    - kernel
+    - efi stub
+    - efistub
+    - systemd-boot
+    - bootmgr
+    - winload
+    - shim
+    - initrd
+    - initramfs
+    - payload
+    - acpi
+    - rsdp
+    - dsdt
+    - madt
+    - srat
+    - slit
+    - hmat
+    - dmar
+    - iommu
+    - memory map
+    - e820
+    - conventionalmemory
+    - runtime
+    - virtualaddress
+    - setvirtualaddressmap
+    - readytoboot
+    - osindications
+    - bootnext
+    - ramdisk
+    - device tree
+    - fdt
+  path_patterns:
+    - bdsdxe
+    - ufeibootmanagerlib
+    - bootmanagerpolicy
+    - osloader
+    - linuxboot
+    - grub
+    - payload
+    - acpitable
+    - acpiplatform
+    - smbios
+    - pcihostbridge
+    - pcibus
+    - iommu
+    - intelvtd
+    - amd-iommu
+    - memorymap
+    - variableruntimedxe
+    - graphicsconsole
+    - consplitter
+    - terminaldxe
+    - ramdisk
+    - httpboot
+    - pxebc
+  risk_signals:
+    - exitbootservices
+    - getmemorymap
+    - setvirtualaddressmap
+    - timeout
+    - pcd
+    - default
+    - bootorder
+    - "null"
+    - efi_error
 
 memory:
+  description: >
+    MRC/FSP memory init, SPD, training, DIMM population, NUMA,
+    and runtime memory-map regressions.
   subsystems:
     - Memory
+    - FSP
+    - NUMA
+    - RAS
+  keywords:
+    - mrc
+    - memory
+    - dimm
+    - ddr
+    - ddr5
+    - ddr4
+    - spd
+    - training
+    - memtest
+    - numa
+    - snc
+    - hem
+    - ecc
+    - patrol scrub
+    - refresh
+    - tck
+    - jedec
+    - smbus
+    - hob
+    - memorymap
+  path_patterns:
+    - memory
+    - mrc
+    - fsp
+    - meminit
+    - silicon/memory
+    - numa
+  risk_signals:
+    - timing
+    - default
+    - pcd
+    - voltage
+    - frequency
 
 pcie:
+  description: >
+    PCIe resource allocation, link training, bifurcation, ASPM,
+    ACS, AER, and device visibility to firmware or OS.
   subsystems:
     - PCIe
+    - IOMMU
+    - ACPI
+    - Platform
+  keywords:
+    - pcie
+    - pci
+    - aspm
+    - aer
+    - acs
+    - bifurcation
+    - link training
+    - ltr
+    - sris
+    - bar
+    - mmio
+    - bus number
+    - root port
+    - endpoint
+    - hotplug
+    - resizable bar
+    - ten bit tag
+  path_patterns:
+    - pcie
+    - pci
+    - pcihostbridge
+    - pcibus
+    - pcirootbridge
+    - silicon/pcie
+  risk_signals:
+    - timeout
+    - default
+    - pcd
+    - resource
+    - mmio
 
 network:
+  description: >
+    PXE, HTTP boot, UNDI/SNP, NIC init, and network-stack
+    regressions that block OS install or remote boot.
   subsystems:
     - Network
+    - Boot
+    - BDS
+    - OSLoader
+  keywords:
+    - pxe
+    - http boot
+    - undi
+    - snp
+    - mtftp
+    - dhcp
+    - ip4
+    - ip6
+    - nic
+    - mac
+    - vlan
+    - iscsi
+    - infiniband
+    - rdma
+  path_patterns:
+    - network
+    - pxe
+    - httpboot
+    - snpdxe
+    - mtftp
+    - dhcp4
+    - undi
+    - networkpkg
+  risk_signals:
+    - timeout
+    - default
+    - dhcp
 
 storage:
+  description: >
+    NVMe, SATA/AHCI, SCSI, RAID, and boot-disk visibility.
   subsystems:
     - Storage
+    - Boot
+    - PCIe
+  keywords:
+    - nvme
+    - sata
+    - ahci
+    - scsi
+    - raid
+    - disk
+    - ufs
+    - emmc
+    - sd card
+    - blockio
+    - partition
+    - gpt
+    - eltorito
+  path_patterns:
+    - nvme
+    - sata
+    - ahci
+    - scsi
+    - storage
+    - raid
+    - diskio
+    - partition
+    - fat
+  risk_signals:
+    - timeout
+    - pcd
+    - default
 
 security:
+  description: >
+    Secure Boot, authenticated variables, key enrollment,
+    flash protection, and BIOS Guard / Boot Guard policy.
   subsystems:
     - Security
+    - TPM
+    - Variable
+    - Boot
+  keywords:
+    - secure boot
+    - secureboot
+    - dbx
+    - kek
+    - pk
+    - authenticated variable
+    - bios guard
+    - bootguard
+    - intel boot guard
+    - flash lock
+    - spi
+    - pfr
+    - measured
+  path_patterns:
+    - secureboot
+    - securitypkg
+    - tcg
+    - tpm
+    - authvariable
+    - bootguard
+    - biosguard
+    - spi
+  risk_signals:
+    - default
+    - pcd
+    - policy
+    - disable
 
 power:
+  description: >
+    S0ix/S3/S5, ACPI sleep states, power buttons, VR, and
+    platform power-policy regressions.
   subsystems:
     - Platform
+    - ACPI
+    - Resume
+    - CPU
+  keywords:
+    - s3
+    - s5
+    - s0ix
+    - sleep
+    - shutdown
+    - power
+    - g3
+    - vr
+    - pstate
+    - cstate
+    - rapl
+    - acpi
+    - _pts
+    - _waked
+    - powerbutton
+  path_patterns:
+    - power
+    - acpi
+    - s3
+    - sleep
+    - silicon/power
+  risk_signals:
+    - timeout
+    - default
+    - pcd
+
+acpi:
+  description: >
+    ACPI table content and installation (DSDT/SSDT/MADT/SRAT/MCFG/HPET/FADT).
+    Broken tables commonly cause OS boot, NUMA, and interrupt failures.
+  subsystems:
+    - ACPI
+    - OSLoader
+    - CPU
+    - NUMA
+    - PCIe
+  keywords:
+    - acpi
+    - dsdt
+    - ssdt
+    - madt
+    - srat
+    - slit
+    - hmat
+    - mcfg
+    - fadt
+    - facs
+    - hpet
+    - xsdt
+    - rsdt
+    - rsdp
+    - aml
+    - asl
+    - nvs
+  path_patterns:
+    - acpi
+    - acpitable
+    - acpiplatform
+    - aml
+    - asl
+  risk_signals:
+    - table
+    - default
+    - oem
+
+ras:
+  description: >
+    Machine-check, error injection, memory CE/UCE, PCIe AER,
+    and firmware-first RAS handling.
+  subsystems:
+    - RAS
+    - Memory
+    - PCIe
+    - CPU
+    - ACPI
+  keywords:
+    - ras
+    - mce
+    - cmci
+    - einj
+    - bert
+    - hest
+    - erst
+    - aer
+    - corrected error
+    - uncorrected
+    - patrol
+    - leaky bucket
+    - firmware first
+  path_patterns:
+    - ras
+    - error
+    - mce
+    - einj
+    - hest
+  risk_signals:
+    - threshold
+    - default
+    - pcd
+    - policy
+
+cxl:
+  description: >
+    Compute Express Link device discovery, DVSEC, HDM decoders,
+    and CXL memory as a NUMA node.
+  subsystems:
+    - CXL
+    - PCIe
+    - Memory
+    - ACPI
+    - NUMA
+  keywords:
+    - cxl
+    - dvsec
+    - hdm
+    - cdat
+    - flexbus
+    - type3
+    - persistent memory
+  path_patterns:
+    - cxl
+  risk_signals:
+    - default
+    - pcd
+    - decoder
+
+tpm:
+  description: >
+    TPM 2.0, TCG2, PCR extensions, measured boot, and TPM device
+    presence for OS and attestation.
+  subsystems:
+    - TPM
+    - Security
+    - MeasuredBoot
+  keywords:
+    - tpm
+    - tcg
+    - pcr
+    - measured boot
+    - event log
+    - tpm2
+    - crb
+    - fifo
+    - locality
+    - hash
+    - sha256
+  path_patterns:
+    - tpm
+    - tcg
+    - tcg2
+    - measuredboot
+  risk_signals:
+    - pcr
+    - timeout
+    - default
+
+smm:
+  description: >
+    SMM/SMI handlers, SMRAM, SMM communication, and runtime
+    SMI storms or unlocks.
+  subsystems:
+    - SMM
+    - Security
+    - Variable
+    - RAS
+  keywords:
+    - smm
+    - smi
+    - smram
+    - smbase
+    - swsmi
+    - smmcommunication
+    - runtime
+  path_patterns:
+    - smm
+    - pi-smm
+    - smmcore
+    - smmcommunication
+  risk_signals:
+    - unlock
+    - default
+    - handler
+
+usb:
+  description: >
+    USB host, keyboard/mouse, mass storage, and USB boot.
+  subsystems:
+    - USB
+    - Boot
+    - BDS
+  keywords:
+    - usb
+    - xhci
+    - ehci
+    - hid
+    - keyboard
+    - mouse
+    - usb boot
+  path_patterns:
+    - usb
+    - xhci
+    - ehci
+    - usbkb
+    - usbmouse
+    - usbbus
+  risk_signals:
+    - timeout
+    - pcd
+
+graphics:
+  description: >
+    GOP, VGA, display output, console splitter, and early OS
+    framebuffer handoff.
+  subsystems:
+    - Graphics
+    - BDS
+    - OSLoader
+  keywords:
+    - gop
+    - graphics
+    - framebuffer
+    - vga
+    - vbt
+    - display
+    - igfx
+    - aspeed
+    - console
+  path_patterns:
+    - graphics
+    - gop
+    - vga
+    - consplitter
+    - graphicsconsole
+    - display
+  risk_signals:
+    - default
+    - mode
+    - pcd
+
+bmc:
+  description: >
+    BMC/IPMI/Redfish out-of-band management, KCS/BT, SOL, and
+    BIOS-BMC communication.
+  subsystems:
+    - BMC
+    - IPMI
+    - Serial
+  keywords:
+    - bmc
+    - ipmi
+    - kcs
+    - redfish
+    - sol
+    - aspeed
+    - openbmc
+    - smlbus
+  path_patterns:
+    - bmc
+    - ipmi
+    - kcs
+    - redfish
+  risk_signals:
+    - timeout
+    - default
+
+thermal:
+  description: >
+    Fan control, PECI, DTS, PROCHOT, and thermal trip policy.
+  subsystems:
+    - Thermal
+    - CPU
+    - BMC
+    - ACPI
+  keywords:
+    - thermal
+    - fan
+    - peci
+    - dts
+    - prochot
+    - trip
+    - pwm
+  path_patterns:
+    - thermal
+    - fan
+    - peci
+  risk_signals:
+    - threshold
+    - default
+
+resume:
+  description: >
+    S3/S0ix resume, boot script, and OS resume from sleep.
+  subsystems:
+    - Resume
+    - ACPI
+    - Memory
+    - Boot
+    - Variable
+  keywords:
+    - s3
+    - resume
+    - bootscript
+    - s3saverestore
+    - wakestatus
+    - rtc alarm
+  path_patterns:
+    - s3
+    - resume
+    - bootscript
+    - s3savestate
+    - acpis3
+  risk_signals:
+    - timeout
+    - script
+    - default
+
+smbios:
+  description: >
+    SMBIOS/DMI tables consumed by OS, inventory, and licensing.
+  subsystems:
+    - SMBIOS
+    - OSLoader
+    - Platform
+  keywords:
+    - smbios
+    - dmi
+    - type 1
+    - type 2
+    - type 17
+    - uuid
+    - serial
+  path_patterns:
+    - smbios
+    - dmi
+  risk_signals:
+    - default
+    - string
+
+cpu:
+  description: >
+    CPU enumeration, MP init, microcode, features (VMX/SVM,
+    SGX, TME), and MADT topology.
+  subsystems:
+    - CPU
+    - ACPI
+    - FSP
+    - NUMA
+  keywords:
+    - cpu
+    - microcode
+    - mp
+    - apic
+    - x2apic
+    - vmx
+    - svm
+    - sgx
+    - tme
+    - mktme
+    - hyperthread
+    - core
+    - thread
+    - madt
+  path_patterns:
+    - cpu
+    - microcode
+    - mpinit
+    - silicon/cpu
+  risk_signals:
+    - default
+    - pcd
+    - feature
+
+fit:
+  description: >
+    Firmware Interface Table, ACM, Boot Guard chain, and
+    flash-layout / recovery boot blocks.
+  subsystems:
+    - FIT
+    - Security
+    - Boot
+    - Platform
+  keywords:
+    - fit
+    - acm
+    - bootguard
+    - ibb
+    - km
+    - bpm
+    - flash layout
+  path_patterns:
+    - fit
+    - acm
+    - bootguard
+    - ftool
+  risk_signals:
+    - layout
+    - default
+
+measured_boot:
+  description: >
+    TCG measured boot, event log, PCR extend policy, and
+    attestation failures at OS boot.
+  subsystems:
+    - MeasuredBoot
+    - TPM
+    - Security
+    - Boot
+    - OSLoader
+  keywords:
+    - measured boot
+    - tcg event
+    - pcr
+    - ev_separator
+    - ev_efi
+    - event log
+  path_patterns:
+    - measured
+    - tcg
+    - tcg2
+  risk_signals:
+    - pcr
+    - log
+    - default
+
+secure_boot:
+  description: >
+    UEFI Secure Boot verification of OS loaders, shim, and
+    authenticated boot options.
+  subsystems:
+    - Security
+    - Boot
+    - OSLoader
+    - Variable
+  keywords:
+    - secure boot
+    - image verification
+    - authenticode
+    - db
+    - dbx
+    - kek
+    - pk
+    - shim
+    - mok
+  path_patterns:
+    - secureboot
+    - imageauthentication
+    - securitypkg
+  risk_signals:
+    - policy
+    - default
+    - disable
+
+watchdog:
+  description: >
+    Hardware watchdog, TCO, and firmware watchdog that reboot
+    the platform during boot or OS runtime.
+  subsystems:
+    - Watchdog
+    - Platform
+    - BMC
+    - Boot
+  keywords:
+    - watchdog
+    - tco
+    - wdt
+    - reboot
+  path_patterns:
+    - watchdog
+    - tco
+    - wdt
+  risk_signals:
+    - timeout
+    - default
+    - enable
+
+serial:
+  description: >
+    UART/SOL console used for PEI/DXE debug and Linux earlyprintk.
+  subsystems:
+    - Serial
+    - BMC
+    - Boot
+    - OSLoader
+  keywords:
+    - serial
+    - uart
+    - com
+    - sol
+    - earlyprintk
+    - console=
+    - baud
+  path_patterns:
+    - serial
+    - uart
+    - terminal
+    - debuglib
+  risk_signals:
+    - baud
+    - default
+    - pcd
+
+ipmi:
+  description: >
+    IPMI commands, sensors, FRU, and boot flags from BMC.
+  subsystems:
+    - IPMI
+    - BMC
+    - Boot
+  keywords:
+    - ipmi
+    - kcs
+    - bt
+    - ssif
+    - fru
+    - sdr
+    - boot flags
+  path_patterns:
+    - ipmi
+    - kcs
+  risk_signals:
+    - timeout
+    - retry
+
+me:
+  description: >
+    Intel CSME/ME, SPS, AMT, and ME-BIOS boot-guard handshake.
+  subsystems:
+    - ME
+    - Security
+    - FIT
+    - Platform
+  keywords:
+    - csme
+    - me
+    - sps
+    - amt
+    - heci
+    - mei
+  path_patterns:
+    - me
+    - csme
+    - heci
+    - sps
+  risk_signals:
+    - timeout
+    - firmware
+    - default
+
+gpio:
+  description: >
+    GPIO/pad configuration that affects reset, power, and devices.
+  subsystems:
+    - GPIO
+    - Platform
+    - Power
+  keywords:
+    - gpio
+    - pad
+    - gpp
+    - gpd
+    - mux
+  path_patterns:
+    - gpio
+    - pad
+  risk_signals:
+    - default
+    - ownership
+
+variable:
+  description: >
+    NVRAM UEFI variables, fault-tolerant write, and Boot#### /
+    BootOrder corruption.
+  subsystems:
+    - Variable
+    - Boot
+    - Security
+    - Resume
+  keywords:
+    - variable
+    - nvram
+    - bootorder
+    - ftw
+    - fault tolerant
+    - efi variable
+    - getvariable
+    - setvariable
+  path_patterns:
+    - variable
+    - nvram
+    - faulttolerantwrite
+    - variableruntime
+  risk_signals:
+    - default
+    - size
+    - corrupt
+
+capsule:
+  description: >
+    Capsule update, ESRT, and firmware update that bricks or
+    loops the platform.
+  subsystems:
+    - Capsule
+    - Variable
+    - Boot
+    - Security
+  keywords:
+    - capsule
+    - esrt
+    - firmware update
+    - fmp
+    - capsuleonflash
+  path_patterns:
+    - capsule
+    - esrt
+    - fmp
+    - systemfirmwareupdate
+  risk_signals:
+    - update
+    - default
+
+iommu:
+  description: >
+    VT-d/AMD-Vi, DMAR/IVRS ACPI tables, and DMA remapping that
+    hang the OS at boot when misprogrammed.
+  subsystems:
+    - IOMMU
+    - ACPI
+    - PCIe
+    - OSLoader
+    - Security
+  keywords:
+    - iommu
+    - vt-d
+    - vtd
+    - dmar
+    - ivrs
+    - dma
+    - remapping
+    - ats
+  path_patterns:
+    - iommu
+    - vtd
+    - intelvtd
+    - dmar
+    - amdiommu
+  risk_signals:
+    - default
+    - pcd
+    - enable
+
+numa:
+  description: >
+    NUMA/SNC/Sub-NUMA, SRAT/SLIT/HMAT, and proximity domains
+    that crash the OS or pin memory incorrectly.
+  subsystems:
+    - NUMA
+    - ACPI
+    - Memory
+    - CPU
+    - OSLoader
+  keywords:
+    - numa
+    - snc
+    - hem
+    - srat
+    - slit
+    - hmat
+    - proximity
+    - cluster
+  path_patterns:
+    - numa
+    - snc
+    - srat
+  risk_signals:
+    - default
+    - topology
+
+csm:
+  description: >
+    Compatibility Support Module / legacy BIOS boot (INT19,
+    option ROMs) vs pure UEFI.
+  subsystems:
+    - CSM
+    - Boot
+    - BDS
+    - Graphics
+  keywords:
+    - csm
+    - legacy
+    - option rom
+    - int19
+    - bios boot
+    - mbr
+  path_patterns:
+    - csm
+    - legacy
+    - optionrom
+  risk_signals:
+    - enable
+    - default
+
+linuxboot:
+  description: >
+    LinuxBoot/u-root/Heads payload replacing DXE BDS, kernel
+    kexec into the target OS.
+  subsystems:
+    - LinuxBoot
+    - OSLoader
+    - Boot
+    - Network
+    - Storage
+  keywords:
+    - linuxboot
+    - u-root
+    - heads
+    - kexec
+    - bzimage
+    - payload
+    - slboot
+  path_patterns:
+    - linuxboot
+    - u-root
+    - heads
+    - payload
+    - linux
+  risk_signals:
+    - cmdline
+    - default
+    - timeout
+
+fsp:
+  description: >
+    Intel FSP-T/M/S API, UPD defaults, and silicon init that
+    break boot or memory.
+  subsystems:
+    - FSP
+    - Memory
+    - CPU
+    - Platform
+    - Boot
+  keywords:
+    - fsp
+    - upd
+    - fsp-m
+    - fsp-s
+    - fsp-t
+    - notifyphase
+    - siliconinit
+  path_patterns:
+    - fsp
+    - fspwrapper
+    - intelfsp2pkg
+    - upd
+  risk_signals:
+    - upd
+    - default
+    - pcd
+
+generic:
+  description: >
+    Catch-all when the failure class is unknown. Uses broad
+    firmware signals, hazards, and change size without
+    strongly biasing a single subsystem.
+  subsystems:
+    - Platform
+    - Boot
+    - Memory
+    - PCIe
+    - ACPI
+    - Security
+  keywords:
+    - regression
+    - revert
+    - workaround
+    - hang
+    - crash
+    - panic
+    - timeout
+    - fail
+    - bug
+  path_patterns:
+    - platform
+    - silicon
+  risk_signals:
+    - revert
+    - workaround
+    - timeout
+    - assert
+    - pcd
+    - default
+    - "null"

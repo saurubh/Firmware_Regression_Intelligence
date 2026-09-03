@@ -10,8 +10,8 @@ signals used by the Candidate Engine.
 from __future__ import annotations
 
 import re
-from typing import Set
 
+from fri.analyzer.hazard_detector import HazardDetector
 from fri.models import DiffEvidence
 
 
@@ -23,21 +23,15 @@ class DiffAnalyzer:
     It only extracts evidence.
     """
 
-    #
-    # Firmware keywords
-    #
     KEYWORDS = {
-
         "BOOT",
         "BOOTGUARD",
         "MEASUREDBOOT",
         "SECUREBOOT",
-
         "MRC",
         "MEMORY",
         "DIMM",
         "DDR",
-
         "PCI",
         "PCIE",
         "ACPI",
@@ -45,173 +39,131 @@ class DiffAnalyzer:
         "NUMA",
         "SNC",
         "CXL",
-
         "FIT",
         "TPM",
         "PCR",
-
         "PEI",
         "DXE",
         "SMM",
-
+        "BDS",
         "POLICY",
         "PLATFORM",
-
         "SETUP",
         "VARIABLE",
-        "PCD"
+        "PCD",
+        "FSP",
+        "UPD",
+        "IOMMU",
+        "VTD",
+        "DMAR",
+        "SMBIOS",
+        "LINUXBOOT",
+        "GRUB",
+        "KERNEL",
+        "EXITBOOTSERVICES",
+        "GETMEMORYMAP",
+        "LOADIMAGE",
+        "STARTIMAGE",
+        "BOOTORDER",
+        "WATCHDOG",
+        "IPMI",
+        "BMC",
+        "USB",
+        "NVME",
+        "PXE",
+        "GOP",
+        "CSM",
+        "RESUME",
+        "S3",
+        "MICROCODE",
+        "MADT",
+        "SRAT",
+        "DSDT",
+        "KEXEC",
+        "EFISTUB",
+        "SHIM",
     }
 
-    #
-    # Regex
-    #
-    FUNCTION_REGEX = re.compile(
+    FUNCTION_REGEX = re.compile(r"^[\+\-].*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
-        r"^[\+\-].*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\("
+    MACRO_REGEX = re.compile(r"^[\+\-]\s*#define\s+([A-Za-z0-9_]+)")
 
-    )
+    FILE_HEADER = re.compile(r"^\+\+\+\s+b/(.+)$")
 
-    MACRO_REGEX = re.compile(
+    def __init__(self) -> None:
+        self.hazards = HazardDetector()
 
-        r"^[\+\-]\s*#define\s+([A-Za-z0-9_]+)"
-
-    )
-
-    # ======================================================
-
-    def analyze(
-        self,
-        diff_text: str
-    ) -> DiffEvidence:
-
+    def analyze(self, diff_text: str) -> DiffEvidence:
         evidence = DiffEvidence()
 
         if not diff_text:
-
             return evidence
 
-        keywords: Set[str] = set()
-
-        functions: Set[str] = set()
-
-        macros: Set[str] = set()
+        keywords: set[str] = set()
+        functions: set[str] = set()
+        macros: set[str] = set()
+        files: set[str] = set()
 
         for line in diff_text.splitlines():
-
-            #
-            # Ignore diff headers
-            #
-            if line.startswith("+++") or line.startswith("---"):
-
+            file_match = self.FILE_HEADER.match(line)
+            if file_match:
+                files.add(file_match.group(1))
                 continue
 
-            #
-            # Added / Removed
-            #
+            if line.startswith("+++") or line.startswith("---"):
+                continue
+
             if line.startswith("+"):
-
                 evidence.added_lines += 1
-
             elif line.startswith("-"):
-
                 evidence.removed_lines += 1
+            else:
+                continue
 
             upper = line.upper()
 
-            #
-            # Firmware keywords
-            #
             for keyword in self.KEYWORDS:
-
-                if keyword in upper:
-
+                if re.search(
+                    rf"(?<![A-Z0-9_]){re.escape(keyword)}(?![A-Z0-9_])",
+                    upper,
+                ):
                     keywords.add(keyword)
 
-            #
-            # Functions
-            #
             match = self.FUNCTION_REGEX.match(line)
-
             if match:
+                functions.add(match.group(1))
 
-                functions.add(
-
-                    match.group(1)
-
-                )
-
-            #
-            # Macros
-            #
             match = self.MACRO_REGEX.match(line)
-
             if match:
+                macros.add(match.group(1))
 
-                macros.add(
-
-                    match.group(1)
-
-                )
-
-        #
-        # Stable ordering
-        #
         evidence.firmware_keywords = sorted(keywords)
-
         evidence.modified_functions = sorted(functions)
-
         evidence.modified_macros = sorted(macros)
-
+        evidence.modified_files = sorted(files)
         evidence.tokens = (
-
-            evidence.firmware_keywords +
-
-            evidence.modified_functions +
-
-            evidence.modified_macros
-
+            evidence.firmware_keywords
+            + evidence.modified_functions
+            + evidence.modified_macros
         )
-
-        #
-        # Evidence score
-        #
+        evidence.hazards = self.hazards.detect(diff_text)
+        evidence.pcd_names = self.hazards.pcd_names(diff_text)
+        evidence.protocol_hits = self.hazards.protocol_hits(diff_text)
+        evidence.boot_api_hits = self.hazards.boot_api_hits(diff_text)
+        evidence.comment_only = self.hazards.comment_only(diff_text)
         evidence.score = self._score(evidence)
-
         return evidence
 
-    # ======================================================
-
     @staticmethod
-    def _score(
-        evidence: DiffEvidence
-    ) -> int:
-
+    def _score(evidence: DiffEvidence) -> int:
         score = 0
-
-        score += len(
-
-            evidence.firmware_keywords
-
-        ) * 5
-
-        score += len(
-
-            evidence.modified_functions
-
-        ) * 3
-
-        score += len(
-
-            evidence.modified_macros
-
-        ) * 2
-
-        score += min(
-
-            evidence.total_lines // 20,
-
-            20
-
-        )
-
+        score += len(evidence.firmware_keywords) * 5
+        score += len(evidence.modified_functions) * 3
+        score += len(evidence.modified_macros) * 2
+        score += min(evidence.total_lines // 20, 20)
+        score += sum(12 if h.severity == "high" else 6 for h in evidence.hazards)
+        score += min(len(evidence.boot_api_hits) * 8, 24)
+        score += min(len(evidence.pcd_names) * 2, 10)
+        if evidence.comment_only:
+            score = max(0, score - 20)
         return score

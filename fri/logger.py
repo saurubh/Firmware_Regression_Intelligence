@@ -10,8 +10,7 @@ import logging
 import sys
 from pathlib import Path
 
-from fri.constants import LOG_DIR
-from fri.constants import LOG_FILE
+from fri.constants import LOG_DIR, LOG_FILE
 
 
 class Logger:

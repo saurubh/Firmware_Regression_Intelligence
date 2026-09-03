@@ -10,9 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jinja2 import Environment
-from jinja2 import FileSystemLoader
-from jinja2 import select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from fri.constants import (
     HTML_REPORT,
@@ -47,7 +45,7 @@ class HtmlReport:
 
     # ======================================================
 
-    def render(self, report):
+    def render(self, report, top: int = 10):
 
         html = self.template.render(
 
@@ -55,7 +53,7 @@ class HtmlReport:
 
             statistics=report.statistics,
 
-            candidates=report.candidates,
+            candidates=report.candidates[:top],
 
             modules=report.modules,
 

@@ -11,10 +11,6 @@ which firmware domains are affected by a commit.
 
 from __future__ import annotations
 
-from typing import Dict
-from typing import List
-from typing import Set
-
 from fri.config import config
 from fri.models import Commit
 
@@ -22,12 +18,49 @@ from fri.models import Commit
 class FirmwareClassifier:
     """
     Classifies commits into firmware domains using
-    configurable path mappings.
+    configurable path mappings and keyword hints.
     """
+
+    KEYWORD_DOMAINS = {
+        "ACPI": "ACPI",
+        "SMBIOS": "SMBIOS",
+        "LINUXBOOT": "LinuxBoot",
+        "OS BOOT": "OSLoader",
+        "EXITBOOTSERVICES": "OSLoader",
+        "IOMMU": "IOMMU",
+        "VT-D": "IOMMU",
+        "TPM": "TPM",
+        "SECURE BOOT": "Security",
+        "MEASURED BOOT": "MeasuredBoot",
+        "PCIE": "PCIe",
+        "NVME": "Storage",
+        "PXE": "Network",
+        "MRC": "Memory",
+        "FSP": "FSP",
+        "SMM": "SMM",
+        "GRUB": "OSLoader",
+        "KERNEL": "OSLoader",
+        "KEXEC": "LinuxBoot",
+        "SHIM": "OSLoader",
+        "BDS": "BDS",
+        "PEI": "PEI",
+        "DXE": "DXE",
+        "WATCHDOG": "Watchdog",
+        "IPMI": "IPMI",
+        "BMC": "BMC",
+        "GOP": "Graphics",
+        "CSM": "CSM",
+        "S3": "Resume",
+        "NUMA": "NUMA",
+        "CXL": "CXL",
+        "FIT": "FIT",
+        "USB": "USB",
+        "RAS": "RAS",
+    }
 
     def __init__(self):
 
-        self.rules: Dict[str, List[str]] = config.component_map
+        self.rules: dict[str, list[str]] = config.component_map
 
     # ======================================================
     # Public API
@@ -36,8 +69,9 @@ class FirmwareClassifier:
     def classify(self, commit: Commit) -> Commit:
 
         domains = self.classify_files(commit.files)
-
-        commit.domains = domains
+        domains.extend(self.classify_keywords(commit.keywords))
+        # Preserve order while dropping duplicates
+        commit.domains = list(dict.fromkeys(domains))
 
         if domains:
 
@@ -56,10 +90,10 @@ class FirmwareClassifier:
 
     def classify_files(
         self,
-        files: List[str]
-    ) -> List[str]:
+        files: list[str]
+    ) -> list[str]:
 
-        matched: Set[str] = set()
+        matched: set[str] = set()
 
         for filename in files:
 
@@ -72,6 +106,14 @@ class FirmwareClassifier:
                     matched.add(domain)
 
         return sorted(matched)
+
+    def classify_keywords(self, keywords: list[str]) -> list[str]:
+        matched: list[str] = []
+        for keyword in keywords:
+            domain = self.KEYWORD_DOMAINS.get(keyword.upper())
+            if domain:
+                matched.append(domain)
+        return matched
 
     # ======================================================
 
@@ -105,7 +147,7 @@ class FirmwareClassifier:
     @staticmethod
     def _matches(
         filename: str,
-        patterns: List[str]
+        patterns: list[str]
     ) -> bool:
 
         for pattern in patterns:

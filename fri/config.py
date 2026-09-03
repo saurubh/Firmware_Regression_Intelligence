@@ -9,7 +9,7 @@ Loads and validates all application configuration.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
@@ -18,7 +18,6 @@ from fri.constants import (
     CONFIG_FILE,
     FAILURE_PROFILE,
 )
-
 from fri.models import FailureProfile
 
 
@@ -66,7 +65,7 @@ class Config:
     # ==========================================================
 
     @staticmethod
-    def _load_yaml(path: Path) -> Dict[str, Any]:
+    def _load_yaml(path: Path) -> dict[str, Any]:
 
         if not path.exists():
 
@@ -74,7 +73,7 @@ class Config:
                 f"Configuration file not found: {path}"
             )
 
-        with open(path, "r", encoding="utf-8") as fp:
+        with open(path, encoding="utf-8") as fp:
 
             data = yaml.safe_load(fp)
 
@@ -86,8 +85,8 @@ class Config:
 
     @staticmethod
     def _normalize_component_map(
-        mapping: Dict[str, Any]
-    ) -> Dict[str, list]:
+        mapping: dict[str, Any]
+    ) -> dict[str, list]:
 
         normalized = {}
 
@@ -95,7 +94,7 @@ class Config:
 
             normalized[domain] = [
 
-                p.replace("\\", "/").lower().rstrip("/")
+                p.replace("\\", "/").lower()
 
                 for p in paths
 
@@ -110,7 +109,7 @@ class Config:
     @staticmethod
     def _load_failure_profiles(
         path: Path
-    ) -> Dict[str, FailureProfile]:
+    ) -> dict[str, FailureProfile]:
 
         raw = Config._load_yaml(path)
 
@@ -119,25 +118,12 @@ class Config:
         for name, profile in raw.items():
 
             profiles[name.lower()] = FailureProfile(
-
                 name=name,
-
-                domains=profile.get(
-
-                    "subsystems",
-
-                    []
-
-                ),
-
-                keywords=profile.get(
-
-                    "keywords",
-
-                    []
-
-                )
-
+                description=str(profile.get("description", "")).strip(),
+                domains=profile.get("subsystems", []) or [],
+                keywords=[item for item in (profile.get("keywords") or []) if isinstance(item, str)],
+                path_patterns=[item for item in (profile.get("path_patterns") or []) if isinstance(item, str)],
+                risk_signals=[item for item in (profile.get("risk_signals") or []) if isinstance(item, str)],
             )
 
         return profiles

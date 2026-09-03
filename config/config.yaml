@@ -2,6 +2,8 @@ debug: false
 
 analysis:
   minimum_confidence: 25
+  # Independent signals (path, keyword, hazard, boot API) raise a
+  # commit even when the raw diff is small.
 
 report:
   top_candidates: 10

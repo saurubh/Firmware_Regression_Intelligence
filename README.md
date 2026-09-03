@@ -8,11 +8,12 @@ Instead of manually reviewing hundreds of commits, FRI combines Git history, com
 
 # Features
 
-- Analyze firmware regressions between two Git revisions
+- Analyze firmware **and OS boot** regressions between two Git revisions
+- 36 failure profiles (SEC/PEI/DXE/BDS boot, Linux/Windows/LinuxBoot handoff, ACPI, IOMMU, memory, PCIe, CXL, Secure Boot, SMM, BMC, FSP, and more)
 - Parse firmware commit metadata (Jira, Merge Requests, intent)
-- Firmware-aware subsystem classification
-- Diff analysis with firmware-specific heuristics
-- Candidate scoring and ranking
+- Firmware-aware subsystem classification from paths **and** commit keywords
+- Diff analysis with hazard detection (ExitBootServices, PCD/UPD, ACPI tables, IOMMU, timeouts)
+- Multi-signal candidate scoring (domain, path, keyword, hazard, boot API)
 - Module-level aggregation
 - Interactive HTML dashboard
 - JSON export for automation and CI
@@ -95,13 +96,31 @@ Commands
     doctor
 
     config
+
+    topics
+```
+
+List every regression topic:
+
+```bash
+fri topics
 ```
 
 ---
 
 # Basic Usage
 
-Investigate a firmware regression:
+Investigate a firmware-to-OS boot regression (Linux, Windows, LinuxBoot, GRUB, EFI stub):
+
+```bash
+fri investigate \
+    --repo ~/firmware-repo \
+    --good GOOD_SHA \
+    --bad BAD_SHA \
+    --failure os_boot
+```
+
+Investigate a firmware/BIOS boot regression:
 
 ```bash
 fri investigate \
@@ -249,27 +268,29 @@ pytest --cov=fri
 
 ---
 
-# Supported Firmware Domains
+# Supported Regression Topics
 
-FRI currently recognizes domains such as:
+Use `fri topics` or `--failure <name>`. Built-in profiles:
 
-- Platform
-- Memory
-- Boot
-- PCIe
-- ACPI
-- Security
-- RAS
-- CXL
-- TPM
-- FIT
-- PEI
-- DXE
-- SMM
-- Networking
-- Storage
+| Topic | What it catches |
+| --- | --- |
+| `boot` | Firmware boot (SEC/PEI/DXE/BDS/FSP/FIT) |
+| `os_boot` | OS handoff: ExitBootServices, memory map, ACPI, GRUB, Linux, Windows bootmgr, LinuxBoot |
+| `linuxboot` | LinuxBoot / u-root / kexec payload |
+| `acpi` | DSDT/SSDT/MADT/SRAT/DMAR and other tables the OS consumes |
+| `iommu` | VT-d / AMD-Vi / DMAR programming that hangs the kernel |
+| `memory` | MRC/FSP memory init, DIMM, NUMA |
+| `pcie` | Link training, BARs, resource allocation |
+| `storage` / `network` | Boot disks, NVMe, PXE, HTTP boot |
+| `security` / `secure_boot` / `measured_boot` / `tpm` | Authenticated boot and PCR/event log |
+| `smm` / `variable` / `capsule` | Runtime, NVRAM, firmware update |
+| `cpu` / `numa` / `cxl` / `ras` | Topology, CXL memory, error handling |
+| `graphics` / `serial` / `usb` / `csm` | Console and legacy boot |
+| `bmc` / `ipmi` / `me` / `watchdog` / `thermal` / `gpio` / `power` / `resume` | Platform manageability and sleep |
+| `smbios` / `fit` / `fsp` | Inventory, Boot Guard, silicon UPD |
+| `generic` | Unknown failure class |
 
-Additional domains can be added through configuration.
+Additional domains can be added through `config/failure_profiles.yaml` and `config/component_map.yaml`.
 
 ---
 

@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from git import Repo
 from git.exc import InvalidGitRepositoryError
@@ -51,11 +50,11 @@ class GitCollector:
 
             self.repo = Repo(self.repo_path)
 
-        except InvalidGitRepositoryError:
+        except InvalidGitRepositoryError as err:
 
             raise RuntimeError(
                 f"{repo_path} is not a valid Git repository."
-            )
+            ) from err
 
         #
         # Build resolver
@@ -70,7 +69,7 @@ class GitCollector:
         self,
         good_build: str,
         bad_build: str
-    ) -> List[Commit]:
+    ) -> list[Commit]:
         """
         Collect commits between two builds.
 
@@ -89,7 +88,7 @@ class GitCollector:
             bad[:8]
         )
 
-        commits: List[Commit] = []
+        commits: list[Commit] = []
 
         for git_commit in self.repo.iter_commits(
             revision,

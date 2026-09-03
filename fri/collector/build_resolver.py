@@ -87,13 +87,13 @@ class BuildResolver:
 
             return sha
 
-        except BadName:
+        except BadName as err:
 
             raise RuntimeError(
 
                 f"Unable to resolve build '{build}'."
 
-            )
+            ) from err
 
     # ------------------------------------------------------
 

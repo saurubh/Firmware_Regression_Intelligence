@@ -9,151 +9,91 @@ from __future__ import annotations
 import sys
 
 from fri.cli import build_parser
-
 from fri.engine.investigation_engine import InvestigationEngine
-
 from fri.logger import logger
-
 from fri.report.console_report import ConsoleReport
 from fri.report.html_report import HtmlReport
 from fri.report.json_report import JsonReport
 
 
-# ==========================================================
-# Main
-# ==========================================================
-
 def main() -> int:
-    """
-    FRI application entry point.
-    """
-
     args = build_parser().parse_args()
 
-    #
-    # Future CLI commands
-    #
-    if hasattr(args, "command"):
+    if args.command == "doctor":
+        return _doctor()
 
-        if args.command == "doctor":
+    if args.command == "config":
+        from fri.config import config
 
-            print("FRI installation looks healthy.")
+        print(config.settings)
+        return 0
 
-            return 0
+    if args.command == "topics":
+        return _topics()
 
-        if args.command == "config":
-
-            from fri.config import config
-
-            print(config.settings)
-
-            return 0
-
-        if args.command != "investigate":
-
-            print("Unknown command.")
-
-            return 1
+    if args.command != "investigate":
+        print("Unknown command.")
+        return 1
 
     logger.info("=" * 80)
-
     logger.info("Firmware Regression Intelligence")
-
     logger.info("=" * 80)
-
     logger.info("Repository   : %s", args.repo)
-
     logger.info("Good Build   : %s", args.good)
-
     logger.info("Bad Build    : %s", args.bad)
-
     logger.info("Failure Type : %s", args.failure)
 
     try:
-
-        #
-        # Investigation
-        #
-        report = InvestigationEngine(
-
-            args.repo
-
-        ).investigate(
-
+        report = InvestigationEngine(args.repo).investigate(
             good=args.good,
-
             bad=args.bad,
-
-            failure=args.failure
-
+            failure=args.failure,
         )
-
-        #
-        # Console
-        #
-        ConsoleReport().render(report)
-
-        #
-        # HTML
-        #
+        ConsoleReport().render(report, top=args.top)
         if args.html:
-
-            output = HtmlReport().render(report)
-
-            logger.info(
-
-                "HTML report : %s",
-
-                output
-
-            )
-
-        #
-        # JSON
-        #
+            output = HtmlReport().render(report, top=args.top)
+            logger.info("HTML report : %s", output)
         if args.json:
-
-            output = JsonReport().render(report)
-
-            logger.info(
-
-                "JSON report : %s",
-
-                output
-
-            )
-
-        logger.info(
-
-            "Investigation completed successfully."
-
-        )
-
+            output = JsonReport().render(report, top=args.top)
+            logger.info("JSON report : %s", output)
+        logger.info("Investigation completed successfully.")
         return 0
-
     except KeyboardInterrupt:
-
-        logger.warning(
-
-            "Interrupted by user."
-
-        )
-
+        logger.warning("Interrupted by user.")
         return 130
-
     except Exception:
-
-        logger.exception(
-
-            "Unexpected failure."
-
-        )
-
+        logger.exception("Unexpected failure.")
         return 1
 
 
-# ==========================================================
+def _doctor() -> int:
+    from fri.config import config
+    from fri.constants import PROJECT_NAME, VERSION
+
+    print(f"{PROJECT_NAME} {VERSION}")
+    print("FRI installation looks healthy.")
+    print(f"Loaded {len(config.failure_profiles)} failure profiles:")
+    for name in sorted(config.failure_profiles):
+        profile = config.failure_profiles[name]
+        print(f"  - {name:16}  domains={len(profile.domains)} keywords={len(profile.keywords)}")
+    print(f"Firmware domains: {', '.join(config.domains())}")
+    return 0
+
+
+def _topics() -> int:
+    from fri.config import config
+
+    print("Regression topics (use with --failure):")
+    print()
+    for name, profile in sorted(config.failure_profiles.items()):
+        description = profile.description.split(".")[0].strip()
+        print(f"  {name}")
+        if description:
+            print(f"      {description}.")
+        print(f"      subsystems: {', '.join(profile.domains)}")
+        print()
+    return 0
+
 
 if __name__ == "__main__":
-
     sys.exit(main())

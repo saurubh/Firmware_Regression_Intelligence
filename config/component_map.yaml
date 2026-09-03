@@ -1,26 +1,267 @@
+# Path fragments mapped to firmware domains.
+# Matching is case-insensitive substring on the normalized file path.
+
 Platform:
-  - Lenovo/Platform
-  - PlatformPkg
+  - lenovo/platform
+  - platformpkg
+  - platform
+  - board
+  - silicon
+  - edk2-platforms
+  - minplatform
+  - boardpkg
 
 Memory:
-  - Memory
-  - Mrc
+  - memory
+  - mrc
+  - meminit
+  - dimm
+  - ddr
+  - spd
+  - numa
 
 FIT:
   - fit
+  - acm
+  - ftool
+  - ibb
 
 Security:
-  - SecureBoot
-  - TPM
+  - secureboot
+  - securitypkg
+  - security
+  - biosguard
+  - bootguard
+  - imageauthentication
+  - authvariable
+  - pfr
 
 PCIe:
-  - PCIe
-  - Pcie
+  - pcie
+  - pci
+  - pcihostbridge
+  - pcibus
+  - pcirootbridge
 
 Network:
-  - PXE
-  - Network
+  - pxe
+  - network
+  - httpboot
+  - snp
+  - undi
+  - mtftp
+  - dhcp
+  - iscsi
+  - networkpkg
 
 Storage:
-  - NVMe
-  - Storage
+  - nvme
+  - storage
+  - sata
+  - ahci
+  - scsi
+  - raid
+  - diskio
+  - partition
+  - fatpkg
+  - ufs
+  - emmc
+
+Boot:
+  - boot
+  - peicore
+  - dxecore
+  - secmain
+  - dxeiplex
+  - reportstatuscode
+  - watchdog
+  - timer
+
+PEI:
+  - pei
+  - peim
+  - peicore
+  - peiservices
+
+DXE:
+  - dxe
+  - dxecore
+  - dxeiplex
+  - dxedriver
+
+BDS:
+  - bds
+  - bdsdxe
+  - ufeibootmanager
+  - bootmanager
+  - bootmaintenance
+
+FSP:
+  - fsp
+  - fspwrapper
+  - intelfsp
+  - upd
+
+ACPI:
+  - acpi
+  - acpitable
+  - acpiplatform
+  - aml
+  - asl
+
+SMBIOS:
+  - smbios
+  - dmi
+
+OSLoader:
+  - osloader
+  - bootload
+  - shim
+  - systemd-boot
+  - bootmgr
+  - efistub
+
+LinuxBoot:
+  - linuxboot
+  - u-root
+  - uroot
+  - heads
+  - payload
+  - bzimage
+  - kexec
+
+IOMMU:
+  - iommu
+  - vtd
+  - intelvtd
+  - dmar
+  - amdiommu
+  - ivrs
+
+Variable:
+  - variable
+  - nvram
+  - faulttolerantwrite
+  - ftw
+  - variableruntime
+
+Graphics:
+  - graphics
+  - gop
+  - vga
+  - consplitter
+  - graphicsconsole
+  - display
+  - framebuffer
+
+RAS:
+  - ras
+  - mce
+  - einj
+  - hest
+  - error
+
+CXL:
+  - cxl
+
+TPM:
+  - tpm
+  - tcg
+  - tcg2
+  - measuredboot
+
+MeasuredBoot:
+  - measured
+  - tcg2dxe
+  - tcgevent
+
+SMM:
+  - smm
+  - smi
+  - smram
+  - pi-smm
+  - smmcore
+
+USB:
+  - usb
+  - xhci
+  - ehci
+  - usbkb
+  - usbmouse
+  - usbbus
+
+BMC:
+  - bmc
+  - openbmc
+  - aspeed
+
+IPMI:
+  - ipmi
+  - kcs
+  - ssif
+
+Thermal:
+  - thermal
+  - fan
+  - peci
+
+Resume:
+  - s3
+  - resume
+  - bootscript
+  - s3savestate
+  - acpis3
+
+CPU:
+  - cpu
+  - microcode
+  - mpinit
+  - processor
+  - apic
+
+Watchdog:
+  - watchdog
+  - tco
+  - wdt
+
+Serial:
+  - serial
+  - uart
+  - terminaldxe
+  - debuglib
+  - statuscode
+
+ME:
+  - /me/
+  - csme
+  - heci
+  - sps
+  - amt
+
+GPIO:
+  - gpio
+  - padcfg
+  - gpiolib
+
+Capsule:
+  - capsule
+  - esrt
+  - fmp
+  - systemfirmwareupdate
+
+NUMA:
+  - numa
+  - snc
+  - proximity
+
+CSM:
+  - csm
+  - legacybios
+  - optionrom
+  - compatibilitysupport
+
+Power:
+  - power
+  - vr
+  - pstate
+  - cstate
