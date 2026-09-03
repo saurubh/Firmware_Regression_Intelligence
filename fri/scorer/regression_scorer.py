@@ -19,12 +19,15 @@ from fri.models import (
     FailureProfile,
     RegressionCandidate,
 )
+from fri.utils.matching import keyword_in_text, path_matches
 
 
 class RegressionScorer:
     """Calculates candidate score and confidence from stacked evidence."""
 
-    DOMAIN_MATCH = 32
+    DOMAIN_MATCH = 28
+    DOMAIN_EXTRA = 10
+    MAX_DOMAIN_POINTS = 48
     PATH_MATCH = 22
     PROFILE_KEYWORD_MESSAGE = 14
     PROFILE_KEYWORD_DIFF = 10
@@ -141,8 +144,7 @@ class RegressionScorer:
         candidate.matched_files = list(commit.files)
         candidate.signal_count = signals
         candidate.score = max(score, 0)
-        # Independent signals lift confidence even when raw score is moderate.
-        candidate.confidence = self._confidence(candidate.score, signals)
+        candidate.confidence = self.absolute_confidence(candidate.score)
         return candidate
 
     def _score_domains(
@@ -152,14 +154,17 @@ class RegressionScorer:
     ) -> int:
         score = 0
         profile_domains = {item.lower() for item in profile.domains}
+        hits = 0
         for domain in candidate.commit.domains:
-            if domain.lower() in profile_domains:
-                score += self.DOMAIN_MATCH
-                candidate.matched_domains.append(domain)
-                candidate.reasons.append(
-                    f"Domain '{domain}' matches failure profile '{profile.name}'."
-                )
-        return score
+            if domain.lower() not in profile_domains:
+                continue
+            hits += 1
+            score += self.DOMAIN_MATCH if hits == 1 else self.DOMAIN_EXTRA
+            candidate.matched_domains.append(domain)
+            candidate.reasons.append(
+                f"Domain '{domain}' matches failure profile '{profile.name}'."
+            )
+        return min(score, self.MAX_DOMAIN_POINTS)
 
     def _score_paths(
         self,
@@ -171,10 +176,9 @@ class RegressionScorer:
         score = 0
         seen: set[str] = set()
         for path in candidate.commit.files:
-            normalized = path.replace("\\", "/").lower()
             for pattern in profile.path_patterns:
                 needle = pattern.lower()
-                if needle and needle in normalized and path not in seen:
+                if needle and path_matches(path, needle) and path not in seen:
                     seen.add(path)
                     score += self.PATH_MATCH
                     candidate.matched_paths.append(path)
@@ -232,7 +236,7 @@ class RegressionScorer:
         for signal in profile.risk_signals:
             if not isinstance(signal, str) or not signal:
                 continue
-            if signal.lower() in haystack:
+            if keyword_in_text(haystack, signal):
                 score += self.RISK_SIGNAL
                 candidate.evidence.append(f"Risk signal: {signal}")
         return min(score, 48)
@@ -356,14 +360,22 @@ class RegressionScorer:
         return True
 
     @staticmethod
-    def _confidence(score: int, signals: int) -> int:
-        """
-        Map raw score to 0-100 with diminishing returns.
+    def absolute_confidence(score: int) -> int:
+        """Per-commit curve that saturates slowly so mid-tier scores stay below 100."""
+        curved = 100.0 * (1.0 - math.exp(-max(score, 0) / 140.0))
+        return max(0, min(99, int(round(curved))))
 
-        Each independent signal (domain, path, keyword, hazard, API)
-        increases confidence so a small but precise OS-boot change
-        can outrank a large unrelated edit.
+    @staticmethod
+    def relative_confidence(score: int, peak: int) -> int:
         """
-        curved = 100.0 * (1.0 - math.exp(-max(score, 0) / 70.0))
-        boosted = curved + min(signals, 6) * 4
-        return max(0, min(100, int(round(boosted))))
+        Spread confidence across an investigation so the top suspects
+        are distinguishable instead of all clamping at 100.
+        """
+        if peak <= 0:
+            return 0
+        if score >= peak:
+            return 100
+        relative = 100.0 * score / peak
+        absolute = 100.0 * (1.0 - math.exp(-score / 140.0))
+        mixed = 0.72 * relative + 0.28 * absolute
+        return max(0, min(100, int(round(mixed))))

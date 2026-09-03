@@ -12,7 +12,9 @@ from __future__ import annotations
 import re
 
 from fri.analyzer.hazard_detector import HazardDetector
+from fri.config import config
 from fri.models import DiffEvidence
+from fri.utils.matching import keyword_in_text
 
 
 class DiffAnalyzer:
@@ -20,69 +22,8 @@ class DiffAnalyzer:
     Extracts firmware evidence from Git diffs.
 
     This class does NOT rank commits.
-    It only extracts evidence.
+    Keywords come from the YAML taxonomy.
     """
-
-    KEYWORDS = {
-        "BOOT",
-        "BOOTGUARD",
-        "MEASUREDBOOT",
-        "SECUREBOOT",
-        "MRC",
-        "MEMORY",
-        "DIMM",
-        "DDR",
-        "PCI",
-        "PCIE",
-        "ACPI",
-        "RAS",
-        "NUMA",
-        "SNC",
-        "CXL",
-        "FIT",
-        "TPM",
-        "PCR",
-        "PEI",
-        "DXE",
-        "SMM",
-        "BDS",
-        "POLICY",
-        "PLATFORM",
-        "SETUP",
-        "VARIABLE",
-        "PCD",
-        "FSP",
-        "UPD",
-        "IOMMU",
-        "VTD",
-        "DMAR",
-        "SMBIOS",
-        "LINUXBOOT",
-        "GRUB",
-        "KERNEL",
-        "EXITBOOTSERVICES",
-        "GETMEMORYMAP",
-        "LOADIMAGE",
-        "STARTIMAGE",
-        "BOOTORDER",
-        "WATCHDOG",
-        "IPMI",
-        "BMC",
-        "USB",
-        "NVME",
-        "PXE",
-        "GOP",
-        "CSM",
-        "RESUME",
-        "S3",
-        "MICROCODE",
-        "MADT",
-        "SRAT",
-        "DSDT",
-        "KEXEC",
-        "EFISTUB",
-        "SHIM",
-    }
 
     FUNCTION_REGEX = re.compile(r"^[\+\-].*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
@@ -92,6 +33,7 @@ class DiffAnalyzer:
 
     def __init__(self) -> None:
         self.hazards = HazardDetector()
+        self.keywords = config.keywords()
 
     def analyze(self, diff_text: str) -> DiffEvidence:
         evidence = DiffEvidence()
@@ -120,13 +62,8 @@ class DiffAnalyzer:
             else:
                 continue
 
-            upper = line.upper()
-
-            for keyword in self.KEYWORDS:
-                if re.search(
-                    rf"(?<![A-Z0-9_]){re.escape(keyword)}(?![A-Z0-9_])",
-                    upper,
-                ):
+            for keyword in self.keywords:
+                if keyword_in_text(line, keyword):
                     keywords.add(keyword)
 
             match = self.FUNCTION_REGEX.match(line)

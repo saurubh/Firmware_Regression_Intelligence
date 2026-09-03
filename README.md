@@ -474,8 +474,10 @@ Use `fri topics` to list every profile. Built-in `--failure` values include:
 
 ```text
 boot            Firmware boot (SEC / PEI / DXE / BDS / FSP / FIT)
-os_boot         OS handoff: ExitBootServices, memory map, ACPI, GRUB,
-                Linux, Windows bootmgr, LinuxBoot
+os_boot         Firmware changes whose *symptom* is OS handoff failure:
+                ExitBootServices, memory map, ACPI, GRUB, Linux, Windows
+                bootmgr, LinuxBoot. FRI still only reads the firmware Git
+                repo — it does not ingest dmesg, journalctl, or kernel source.
 linuxboot       LinuxBoot / u-root / kexec payload
 acpi            DSDT / SSDT / MADT / SRAT / DMAR and related tables
 iommu           VT-d / AMD-Vi / DMAR programming
@@ -514,7 +516,7 @@ Example:
 
 The failure type influences how commits are evaluated and ranked.
 
-Additional domains and topics can be added through `config/failure_profiles.yaml` and `config/component_map.yaml`.
+Additional domains and topics are **config-only**. Add a domain (paths + keywords) in `config/component_map.yaml` and a profile in `config/failure_profiles.yaml`. The CLI reads `--failure` choices from the YAML; you do not need to edit Python constants or keyword sets.
 
 ---
 

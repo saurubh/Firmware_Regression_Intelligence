@@ -89,6 +89,7 @@ class JsonReport:
                 {
                     "name": module.name,
                     "confidence": module.confidence,
+                    "strength": module.strength,
                     "commits": [commit.short_sha for commit in module.commits],
                     "jiras": module.jiras,
                     "authors": module.authors,

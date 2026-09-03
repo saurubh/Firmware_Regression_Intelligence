@@ -17,7 +17,7 @@ from fri.analyzer.module_analyzer import ModuleAnalyzer
 from fri.classifier.classifier import FirmwareClassifier
 from fri.collector.git_collector import GitCollector
 from fri.config import config
-from fri.constants import HIGH_CONFIDENCE, OS_BOOT_RELATED_TOPICS, SUPPORTED_FAILURES
+from fri.constants import HIGH_CONFIDENCE
 from fri.models import RegressionReport, RegressionStatistics
 from fri.parser.commit_parser import CommitParser
 
@@ -43,7 +43,7 @@ class InvestigationEngine:
             failure=failure_key,
             profile_description=profile.description if profile else "",
             related_topics=self._related_topics(failure_key),
-            covered_topics=list(SUPPORTED_FAILURES),
+            covered_topics=config.failure_names,
         )
 
         commits = self.collector.get_commits(good, bad)
@@ -86,11 +86,11 @@ class InvestigationEngine:
 
     @staticmethod
     def _related_topics(failure: str) -> list[str]:
-        if failure == "os_boot":
-            return list(OS_BOOT_RELATED_TOPICS)
         profile = config.get_failure_profile(failure)
         if not profile:
             return []
+        if profile.related:
+            return [name for name in profile.related if name in config.failure_profiles]
         related = []
         for name, other in config.failure_profiles.items():
             if name == failure:

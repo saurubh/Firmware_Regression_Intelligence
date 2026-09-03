@@ -4,13 +4,16 @@ Firmware Regression Intelligence (FRI)
 Commit Parser
 
 Extracts structured metadata from firmware commit messages.
+Keywords come from the YAML taxonomy, not a hardcoded Python set.
 """
 
 from __future__ import annotations
 
 import re
 
+from fri.config import config
 from fri.models import Commit
+from fri.utils.matching import keyword_in_text
 
 
 class CommitParser:
@@ -44,57 +47,16 @@ class CommitParser:
         re.compile(r"\bpanic\b", re.IGNORECASE): "Panic",
     }
 
-    FEATURE_KEYWORDS = {
-        "TPM",
-        "MRC",
-        "RAS",
-        "FIT",
-        "PXE",
-        "ACPI",
-        "PCIE",
-        "DDR",
-        "DIMM",
-        "NVME",
-        "CXL",
-        "BOOT",
-        "SECURE BOOT",
-        "MEASURED BOOT",
-        "PLATFORM",
-        "NUMA",
-        "SNC",
-        "OS BOOT",
-        "EXITBOOTSERVICES",
-        "LINUXBOOT",
-        "GRUB",
-        "KERNEL",
-        "IOMMU",
-        "VT-D",
-        "SMBIOS",
-        "FSP",
-        "SMM",
-        "S3",
-        "WATCHDOG",
-        "IPMI",
-        "BMC",
-        "USB",
-        "GOP",
-        "CSM",
-        "PEI",
-        "DXE",
-        "BDS",
-        "PCR",
-        "SHIM",
-        "KEXEC",
-    }
+    def __init__(self) -> None:
+        self.feature_keywords = config.keywords()
 
     def parse(self, commit: Commit) -> Commit:
         message = commit.message
-        upper = message.upper()
         commit.jira = self._parse_jira(message)
         commit.merge_request = self._parse_merge_request(message)
         commit.is_merge_commit = commit.is_merge_commit or message.startswith("Merge")
         commit.intent = self._parse_intent(message)
-        commit.keywords = sorted(self._parse_keywords(upper))
+        commit.keywords = sorted(self._parse_keywords(message))
         return commit
 
     def _parse_jira(self, message: str):
@@ -118,7 +80,7 @@ class CommitParser:
 
     def _parse_keywords(self, message: str):
         keywords = set()
-        for keyword in self.FEATURE_KEYWORDS:
-            if keyword in message:
+        for keyword in self.feature_keywords:
+            if keyword_in_text(message, keyword):
                 keywords.add(keyword)
         return keywords

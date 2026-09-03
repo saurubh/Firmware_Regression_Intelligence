@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import argparse
 
-from fri.constants import PROJECT_NAME, SUPPORTED_FAILURES, VERSION
+from fri.config import config
+from fri.constants import PROJECT_NAME, VERSION
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,8 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
     investigate.add_argument(
         "--failure",
         required=True,
-        choices=SUPPORTED_FAILURES,
-        help="Regression failure profile (os_boot covers Linux/Windows/LinuxBoot handoff)",
+        choices=config.failure_names,
+        help="Regression failure profile from config/failure_profiles.yaml",
     )
     investigate.add_argument("--top", type=int, default=10, help="Maximum number of candidates")
     investigate.add_argument("--html", action="store_true", help="Generate HTML dashboard")

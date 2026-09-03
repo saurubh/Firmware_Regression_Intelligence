@@ -39,11 +39,16 @@ class CandidateEngine:
     ) -> list[RegressionCandidate]:
         ranked = sorted(
             candidates,
-            key=lambda c: (c.confidence, c.score, c.signal_count),
+            key=lambda c: (c.score, c.signal_count, c.confidence),
             reverse=True,
         )
+        peak = max((item.score for item in ranked), default=0)
         for rank, candidate in enumerate(ranked, start=1):
             candidate.rank = rank
+            candidate.confidence = self.scorer.relative_confidence(
+                candidate.score,
+                peak,
+            )
         return ranked
 
     def filter_noise(

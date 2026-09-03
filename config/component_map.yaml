@@ -1,267 +1,165 @@
-# Path fragments mapped to firmware domains.
-# Matching is case-insensitive substring on the normalized file path.
+# Firmware domain taxonomy — paths AND keywords.
+#
+# Matching uses token / directory boundaries (see fri.utils.matching).
+# Adding a domain here is enough for classification and keyword extraction;
+# add a failure profile in failure_profiles.yaml to expose it as --failure.
 
 Platform:
-  - lenovo/platform
-  - platformpkg
-  - platform
-  - board
-  - silicon
-  - edk2-platforms
-  - minplatform
-  - boardpkg
+  paths: [lenovo/platform, platformpkg, platform, board, edk2-platforms, minplatform, boardpkg]
+  keywords: [PLATFORM, BOARD]
 
 Memory:
-  - memory
-  - mrc
-  - meminit
-  - dimm
-  - ddr
-  - spd
-  - numa
+  paths: [memory, mrc, meminit, dimm, ddr, spd]
+  keywords: [MRC, MEMORY, DIMM, DDR, DDR4, DDR5, SPD]
 
 FIT:
-  - fit
-  - acm
-  - ftool
-  - ibb
+  paths: [fit, acm, ftool, ibb]
+  keywords: [FIT, ACM, BOOTGUARD, IBB]
 
 Security:
-  - secureboot
-  - securitypkg
-  - security
-  - biosguard
-  - bootguard
-  - imageauthentication
-  - authvariable
-  - pfr
+  paths: [secureboot, securitypkg, security, biosguard, bootguard, imageauthentication, authvariable, pfr]
+  keywords: [SECURE BOOT, SECUREBOOT, BIOS GUARD, BOOTGUARD, PFR]
 
 PCIe:
-  - pcie
-  - pci
-  - pcihostbridge
-  - pcibus
-  - pcirootbridge
+  paths: [pcie, pcihostbridge, pcibus, pcirootbridge]
+  keywords: [PCIE, PCI]
 
 Network:
-  - pxe
-  - network
-  - httpboot
-  - snp
-  - undi
-  - mtftp
-  - dhcp
-  - iscsi
-  - networkpkg
+  paths: [pxe, network, httpboot, snp, undi, mtftp, dhcp, iscsi, networkpkg]
+  keywords: [PXE, NETWORK, HTTPBOOT, UNDI, SNP, DHCP, ISCSI]
 
 Storage:
-  - nvme
-  - storage
-  - sata
-  - ahci
-  - scsi
-  - raid
-  - diskio
-  - partition
-  - fatpkg
-  - ufs
-  - emmc
+  paths: [nvme, storage, sata, ahci, scsi, raid, diskio, partition, fatpkg, ufs, emmc]
+  keywords: [NVME, STORAGE, SATA, AHCI, SCSI, RAID, UFS, EMMC]
 
 Boot:
-  - boot
-  - peicore
-  - dxecore
-  - secmain
-  - dxeiplex
-  - reportstatuscode
-  - watchdog
-  - timer
+  paths: [peicore, dxecore, secmain, dxeiplex, reportstatuscode]
+  keywords: [BOOT, PEI, DXE, SEC, PCD, SETUP, POLICY]
 
 PEI:
-  - pei
-  - peim
-  - peicore
-  - peiservices
+  paths: [pei, peim, peicore, peiservices]
+  keywords: [PEI, PEIM]
 
 DXE:
-  - dxe
-  - dxecore
-  - dxeiplex
-  - dxedriver
+  paths: [dxe, dxecore, dxeiplex, dxedriver]
+  keywords: [DXE]
 
 BDS:
-  - bds
-  - bdsdxe
-  - ufeibootmanager
-  - bootmanager
-  - bootmaintenance
+  paths: [bds, bdsdxe, ufeibootmanager, bootmanager, bootmaintenance]
+  keywords: [BDS, BOOTMANAGER, BOOTORDER, READYTOBOOT]
 
 FSP:
-  - fsp
-  - fspwrapper
-  - intelfsp
-  - upd
+  paths: [fsp, fspwrapper, intelfsp, upd]
+  keywords: [FSP, UPD]
 
 ACPI:
-  - acpi
-  - acpitable
-  - acpiplatform
-  - aml
-  - asl
+  paths: [acpi, acpitable, acpiplatform, aml, asl]
+  keywords: [ACPI, DSDT, SSDT, MADT, SRAT, SLIT, HMAT, MCFG, FADT, HPET, RSDP, AML]
 
 SMBIOS:
-  - smbios
-  - dmi
+  paths: [smbios, dmi]
+  keywords: [SMBIOS, DMI]
 
 OSLoader:
-  - osloader
-  - bootload
-  - shim
-  - systemd-boot
-  - bootmgr
-  - efistub
+  paths: [osloader, bootload, shim, systemd-boot, bootmgr, efistub]
+  keywords: [OS BOOT, OSBOOT, EXITBOOTSERVICES, GETMEMORYMAP, LOADIMAGE, STARTIMAGE, GRUB, KERNEL, SHIM, EFISTUB, BOOTORDER]
 
 LinuxBoot:
-  - linuxboot
-  - u-root
-  - uroot
-  - heads
-  - payload
-  - bzimage
-  - kexec
+  paths: [linuxboot, u-root, uroot, heads, payload, bzimage, kexec]
+  keywords: [LINUXBOOT, KEXEC, BZIMAGE, UROOT, HEADS]
 
 IOMMU:
-  - iommu
-  - vtd
-  - intelvtd
-  - dmar
-  - amdiommu
-  - ivrs
+  paths: [iommu, vtd, intelvtd, dmar, amdiommu, ivrs]
+  keywords: [IOMMU, VTD, VT-D, DMAR, IVRS]
 
 Variable:
-  - variable
-  - nvram
-  - faulttolerantwrite
-  - ftw
-  - variableruntime
+  paths: [variable, nvram, faulttolerantwrite, ftw, variableruntime]
+  keywords: [VARIABLE, NVRAM, BOOTORDER]
 
 Graphics:
-  - graphics
-  - gop
-  - vga
-  - consplitter
-  - graphicsconsole
-  - display
-  - framebuffer
+  paths: [graphics, gop, vga, consplitter, graphicsconsole, display, framebuffer]
+  keywords: [GOP, GRAPHICS, VGA, FRAMEBUFFER]
 
 RAS:
-  - ras
-  - mce
-  - einj
-  - hest
-  - error
+  paths: [ras, mce, einj, hest]
+  keywords: [RAS, MCE, EINJ, HEST, AER]
 
 CXL:
-  - cxl
+  paths: [cxl]
+  keywords: [CXL]
 
 TPM:
-  - tpm
-  - tcg
-  - tcg2
-  - measuredboot
+  paths: [tpm, tcg, tcg2]
+  keywords: [TPM, TCG, PCR, TPM2]
 
 MeasuredBoot:
-  - measured
-  - tcg2dxe
-  - tcgevent
+  paths: [measuredboot, tcg2dxe, tcgevent]
+  keywords: [MEASURED BOOT, MEASUREDBOOT, PCR]
 
 SMM:
-  - smm
-  - smi
-  - smram
-  - pi-smm
-  - smmcore
+  paths: [smm, smi, smram, pi-smm, smmcore]
+  keywords: [SMM, SMI, SMRAM]
 
 USB:
-  - usb
-  - xhci
-  - ehci
-  - usbkb
-  - usbmouse
-  - usbbus
+  paths: [usb, xhci, ehci, usbkb, usbmouse, usbbus]
+  keywords: [USB, XHCI, EHCI]
 
 BMC:
-  - bmc
-  - openbmc
-  - aspeed
+  paths: [bmc, openbmc, aspeed]
+  keywords: [BMC, OPENBMC]
 
 IPMI:
-  - ipmi
-  - kcs
-  - ssif
+  paths: [ipmi, kcs, ssif]
+  keywords: [IPMI, KCS]
 
 Thermal:
-  - thermal
-  - fan
-  - peci
+  paths: [thermal, fan, peci]
+  keywords: [THERMAL, FAN, PECI, PROCHOT]
 
 Resume:
-  - s3
-  - resume
-  - bootscript
-  - s3savestate
-  - acpis3
+  paths: [s3, resume, bootscript, s3savestate, acpis3]
+  keywords: [S3, S4, RESUME, BOOTSCRIPT]
 
 CPU:
-  - cpu
-  - microcode
-  - mpinit
-  - processor
-  - apic
+  paths: [cpu, microcode, mpinit, processor, apic]
+  keywords: [CPU, MICROCODE, APIC, X2APIC]
 
 Watchdog:
-  - watchdog
-  - tco
-  - wdt
+  paths: [watchdog, tco, wdt]
+  keywords: [WATCHDOG, TCO, WDT]
 
 Serial:
-  - serial
-  - uart
-  - terminaldxe
-  - debuglib
-  - statuscode
+  paths: [serial, uart, terminaldxe, debuglib, statuscode]
+  keywords: [SERIAL, UART, SOL, EARLYPRINTK]
 
 ME:
-  - /me/
-  - csme
-  - heci
-  - sps
-  - amt
+  paths: [/me/, csme, heci, sps]
+  keywords: [CSME, HECI, SPS, AMT, ME]
 
 GPIO:
-  - gpio
-  - padcfg
-  - gpiolib
+  paths: [gpio, padcfg, gpiolib]
+  keywords: [GPIO]
 
 Capsule:
-  - capsule
-  - esrt
-  - fmp
-  - systemfirmwareupdate
+  paths: [capsule, esrt, fmp, systemfirmwareupdate]
+  keywords: [CAPSULE, ESRT, FMP]
 
 NUMA:
-  - numa
-  - snc
-  - proximity
+  paths: [numa, snc, proximity]
+  keywords: [NUMA, SNC, HEM]
 
 CSM:
-  - csm
-  - legacybios
-  - optionrom
-  - compatibilitysupport
+  paths: [csm, legacybios, optionrom, compatibilitysupport]
+  keywords: [CSM, LEGACY, OPTION ROM]
 
 Power:
-  - power
-  - vr
-  - pstate
-  - cstate
+  paths: [power, vr, pstate, cstate]
+  keywords: [POWER, PSTATE, CSTATE, S0IX, RAPL]
+
+Clock:
+  paths: [timer, hpet, rtc, tsc, clock]
+  keywords: [HPET, TSC, RTC, TIMER, CLOCK, APIC TIMER]
+
+Virtualization:
+  paths: [vmx, svm, virt, tdx, sev, kvm, hyperv]
+  keywords: [VMX, SVM, VT-X, TDX, SEV, SNP, KVM, HYPER-V, VIRTUALIZATION]

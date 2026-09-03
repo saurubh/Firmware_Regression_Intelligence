@@ -49,6 +49,15 @@ class Commit:
 
 
 @dataclass
+class DomainSpec:
+    """One firmware domain from component_map.yaml."""
+
+    name: str
+    paths: list[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
+
+
+@dataclass
 class FailureProfile:
     """Represents one regression type loaded from failure_profiles.yaml."""
 
@@ -58,6 +67,7 @@ class FailureProfile:
     keywords: list[str] = field(default_factory=list)
     path_patterns: list[str] = field(default_factory=list)
     risk_signals: list[str] = field(default_factory=list)
+    related: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -118,6 +128,7 @@ class ModuleCandidate:
 
     name: str
     confidence: int
+    strength: float = 0.0
     commits: list[Commit] = field(default_factory=list)
     jiras: list[str] = field(default_factory=list)
     merge_requests: list[str] = field(default_factory=list)

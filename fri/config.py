@@ -3,7 +3,9 @@ Firmware Regression Intelligence (FRI)
 
 Configuration Manager
 
-Loads and validates all application configuration.
+Loads the YAML taxonomy: domains (paths + keywords) and failure profiles.
+The CLI reads --failure choices from failure_profiles.yaml, not from
+hardcoded Python tuples.
 """
 
 from __future__ import annotations
@@ -13,242 +15,158 @@ from typing import Any
 
 import yaml
 
-from fri.constants import (
-    COMPONENT_MAP,
-    CONFIG_FILE,
-    FAILURE_PROFILE,
-)
-from fri.models import FailureProfile
+from fri.constants import COMPONENT_MAP, CONFIG_FILE, FAILURE_PROFILE
+from fri.models import DomainSpec, FailureProfile
+from fri.utils.matching import compact_token
 
 
 class Config:
-    """
-    Singleton configuration manager.
-    """
+    """Singleton configuration manager."""
 
     _instance = None
 
     def __new__(cls):
-
         if cls._instance is None:
-
             cls._instance = super().__new__(cls)
-
             cls._instance._loaded = False
-
         return cls._instance
 
     def __init__(self):
-
         if self._loaded:
             return
-
-        #
-        # Raw configuration
-        #
         self._config = self._load_yaml(CONFIG_FILE)
-
-        self._component_map = self._normalize_component_map(
-            self._load_yaml(COMPONENT_MAP)
-        )
-
-        self._failure_profiles = self._load_failure_profiles(
-            FAILURE_PROFILE
-        )
-
+        self._domains = self._load_domains(self._load_yaml(COMPONENT_MAP))
+        self._failure_profiles = self._load_failure_profiles(FAILURE_PROFILE)
         self.validate()
-
         self._loaded = True
-
-    # ==========================================================
-    # YAML Loader
-    # ==========================================================
 
     @staticmethod
     def _load_yaml(path: Path) -> dict[str, Any]:
-
         if not path.exists():
-
-            raise FileNotFoundError(
-                f"Configuration file not found: {path}"
-            )
-
+            raise FileNotFoundError(f"Configuration file not found: {path}")
         with open(path, encoding="utf-8") as fp:
-
             data = yaml.safe_load(fp)
-
         return data or {}
 
-    # ==========================================================
-    # Component Map
-    # ==========================================================
-
     @staticmethod
-    def _normalize_component_map(
-        mapping: dict[str, Any]
-    ) -> dict[str, list]:
-
-        normalized = {}
-
-        for domain, paths in mapping.items():
-
-            normalized[domain] = [
-
-                p.replace("\\", "/").lower()
-
-                for p in paths
-
-            ]
-
-        return normalized
-
-    # ==========================================================
-    # Failure Profiles
-    # ==========================================================
-
-    @staticmethod
-    def _load_failure_profiles(
-        path: Path
-    ) -> dict[str, FailureProfile]:
-
-        raw = Config._load_yaml(path)
-
-        profiles = {}
-
-        for name, profile in raw.items():
-
-            profiles[name.lower()] = FailureProfile(
+    def _load_domains(mapping: dict[str, Any]) -> dict[str, DomainSpec]:
+        domains: dict[str, DomainSpec] = {}
+        for name, spec in mapping.items():
+            if isinstance(spec, list):
+                paths = spec
+                keywords = [name]
+            elif isinstance(spec, dict):
+                paths = spec.get("paths") or spec.get("path_patterns") or []
+                keywords = spec.get("keywords") or [name]
+            else:
+                continue
+            domains[name] = DomainSpec(
                 name=name,
+                paths=[
+                    str(item).replace("\\", "/").lower().strip()
+                    for item in paths
+                    if item
+                ],
+                keywords=[str(item) for item in keywords if isinstance(item, str) and item],
+            )
+        return domains
+
+    @staticmethod
+    def _load_failure_profiles(path: Path) -> dict[str, FailureProfile]:
+        raw = Config._load_yaml(path)
+        profiles: dict[str, FailureProfile] = {}
+        for name, profile in raw.items():
+            if not isinstance(profile, dict):
+                continue
+            profiles[name.lower()] = FailureProfile(
+                name=name.lower(),
                 description=str(profile.get("description", "")).strip(),
                 domains=profile.get("subsystems", []) or [],
-                keywords=[item for item in (profile.get("keywords") or []) if isinstance(item, str)],
-                path_patterns=[item for item in (profile.get("path_patterns") or []) if isinstance(item, str)],
-                risk_signals=[item for item in (profile.get("risk_signals") or []) if isinstance(item, str)],
+                keywords=[
+                    item
+                    for item in (profile.get("keywords") or [])
+                    if isinstance(item, str)
+                ],
+                path_patterns=[
+                    item
+                    for item in (profile.get("path_patterns") or [])
+                    if isinstance(item, str)
+                ],
+                risk_signals=[
+                    item
+                    for item in (profile.get("risk_signals") or [])
+                    if isinstance(item, str)
+                ],
+                related=[
+                    str(item).lower()
+                    for item in (profile.get("related") or [])
+                    if item
+                ],
             )
-
         return profiles
 
-    # ==========================================================
-    # Validation
-    # ==========================================================
-
     def validate(self):
-
-        if not isinstance(self._component_map, dict):
-
-            raise RuntimeError(
-
-                "Invalid component_map.yaml"
-
-            )
-
-        if not isinstance(
-
-            self._failure_profiles,
-
-            dict
-
-        ):
-
-            raise RuntimeError(
-
-                "Invalid failure_profiles.yaml"
-
-            )
-
-    # ==========================================================
-    # Properties
-    # ==========================================================
+        if not self._domains:
+            raise RuntimeError("Invalid component_map.yaml")
+        if not self._failure_profiles:
+            raise RuntimeError("Invalid failure_profiles.yaml")
 
     @property
     def settings(self):
-
         return self._config
 
     @property
-    def component_map(self):
-
-        return self._component_map
+    def domains_spec(self) -> dict[str, DomainSpec]:
+        return self._domains
 
     @property
-    def failure_profiles(self):
+    def component_map(self) -> dict[str, list[str]]:
+        return {name: spec.paths for name, spec in self._domains.items()}
 
+    @property
+    def failure_profiles(self) -> dict[str, FailureProfile]:
         return self._failure_profiles
 
-    # ==========================================================
-    # Helpers
-    # ==========================================================
+    @property
+    def failure_names(self) -> list[str]:
+        return sorted(self._failure_profiles)
 
-    def get(
+    def keywords(self) -> list[str]:
+        """Union of domain and profile keywords — single catalog for parser/diff."""
+        seen: dict[str, str] = {}
+        for spec in self._domains.values():
+            for keyword in spec.keywords:
+                seen.setdefault(compact_token(keyword), keyword)
+        for profile in self._failure_profiles.values():
+            for keyword in profile.keywords:
+                seen.setdefault(compact_token(keyword), keyword)
+        return sorted(seen.values(), key=str.upper)
 
-        self,
+    def keyword_domains(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for spec in self._domains.values():
+            for keyword in spec.keywords:
+                mapping.setdefault(compact_token(keyword), spec.name)
+        return mapping
 
-        key,
-
-        default=None
-
-    ):
-
-        return self._config.get(
-
-            key,
-
-            default
-
-        )
+    def get(self, key, default=None):
+        return self._config.get(key, default)
 
     def has(self, key):
-
         return key in self._config
 
     def is_debug(self) -> bool:
+        return bool(self._config.get("debug", False))
 
-        return bool(
-
-            self._config.get(
-
-                "debug",
-
-                False
-
-            )
-
-        )
-
-    def get_failure_profile(
-
-        self,
-
-        name: str
-
-    ) -> FailureProfile | None:
-
-        return self._failure_profiles.get(
-
-            name.lower()
-
-        )
+    def get_failure_profile(self, name: str) -> FailureProfile | None:
+        return self._failure_profiles.get(name.lower())
 
     def domains(self):
-
-        return list(
-
-            self._component_map.keys()
-
-        )
-
-    # ==========================================================
-    # Reload
-    # ==========================================================
+        return list(self._domains.keys())
 
     def reload(self):
-
         self._loaded = False
-
         self.__init__()
 
 
-#
-# Global singleton
-#
 config = Config()

@@ -1,11 +1,15 @@
+from fri.cli import build_parser
 from fri.config import config
-from fri.constants import SUPPORTED_FAILURES
 
 
-def test_every_constant_has_a_yaml_profile():
-    loaded = set(config.failure_profiles)
-    expected = set(SUPPORTED_FAILURES)
-    assert expected == loaded
+def test_failure_choices_are_loaded_from_yaml():
+    parser = build_parser()
+    investigate = parser._subparsers._group_actions[0].choices["investigate"]
+    action = next(item for item in investigate._actions if "--failure" in item.option_strings)
+    assert set(action.choices) == set(config.failure_profiles)
+    assert "os_boot" in action.choices
+    assert "clock" in action.choices
+    assert "virtualization" in action.choices
 
 
 def test_os_boot_profile_covers_handoff_surfaces():
@@ -25,7 +29,7 @@ def test_os_boot_profile_covers_handoff_surfaces():
     assert "BDS" in profile.domains
     assert "ACPI" in profile.domains
     assert "OSLoader" in profile.domains
-    assert any("bds" in path.lower() for path in profile.path_patterns)
+    assert "acpi" in profile.related
 
 
 def test_profiles_expose_matchers():
@@ -33,3 +37,9 @@ def test_profiles_expose_matchers():
         assert profile.domains, name
         assert profile.keywords, name
         assert profile.description, name
+
+
+def test_taxonomy_keywords_unify_secure_boot_spellings():
+    compact = {item.replace(" ", "").replace("-", "").upper() for item in config.keywords()}
+    assert "SECUREBOOT" in compact
+    assert "EXITBOOTSERVICES" in compact

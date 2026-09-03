@@ -76,6 +76,25 @@ os_boot:
     - Graphics
     - Network
     - Storage
+  related:
+    - boot
+    - acpi
+    - smbios
+    - iommu
+    - memory
+    - pcie
+    - variable
+    - graphics
+    - storage
+    - network
+    - linuxboot
+    - secure_boot
+    - measured_boot
+    - numa
+    - csm
+    - serial
+    - watchdog
+    - resume
   keywords:
     - os boot
     - osboot
@@ -1153,3 +1172,61 @@ generic:
     - pcd
     - default
     - "null"
+
+clock:
+  description: >
+    Timers, TSC, HPET, RTC, and APIC timer programming that
+    surface as hangs, time-warps, or failed OS init.
+  subsystems:
+    - Clock
+    - CPU
+    - ACPI
+    - OSLoader
+  keywords:
+    - hpet
+    - tsc
+    - rtc
+    - timer
+    - clock
+    - apic timer
+    - delay
+  path_patterns:
+    - timer
+    - hpet
+    - rtc
+  risk_signals:
+    - timeout
+    - default
+    - pcd
+
+virtualization:
+  description: >
+    VMX/SVM, TDX/SEV, and hypervisor-facing firmware that
+    breaks guest or host OS boot.
+  subsystems:
+    - Virtualization
+    - CPU
+    - IOMMU
+    - Security
+    - ACPI
+  keywords:
+    - vmx
+    - svm
+    - vt-x
+    - tdx
+    - sev
+    - snp
+    - kvm
+    - hyper-v
+    - virtualization
+  path_patterns:
+    - vmx
+    - svm
+    - tdx
+    - sev
+    - virt
+  risk_signals:
+    - enable
+    - default
+    - pcd
+
