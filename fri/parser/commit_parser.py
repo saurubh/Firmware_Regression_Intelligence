@@ -40,7 +40,7 @@ class CommitParser:
         re.compile(r"\brefactor\b", re.IGNORECASE): "Refactor",
         re.compile(r"\bsupport\b", re.IGNORECASE): "Support",
         re.compile(r"\badd\b", re.IGNORECASE): "Add",
-        re.compile(r"\bhang\b", re.IGNORECASE): "Hang",
+        re.compile(r"\bhangs?\b", re.IGNORECASE): "Hang",
         re.compile(r"\bpanic\b", re.IGNORECASE): "Panic",
     }
 
