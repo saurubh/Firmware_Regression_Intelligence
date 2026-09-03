@@ -56,3 +56,7 @@ def test_workspace_and_pins_cli_flags():
     assert args.repo is None
     pins = parser.parse_args(["pins", "--workspace", "/tmp/bios", "--good", "G", "--bad", "B"])
     assert pins.command == "pins"
+
+
+def test_package_version():
+    assert VERSION.startswith("2.")

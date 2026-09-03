@@ -32,11 +32,15 @@ def _bios_workspace(tmp_path: Path) -> tuple[Path, str, str]:
 
     ws = tmp_path / "platform"
     plat = _init_repo(ws)
-    plat.git.config("protocol.file.allow", "always")
     _write(ws / "PlatformPkg" / "Platform.c", "void PlatformInit(void) { }\n")
     plat.index.add(["PlatformPkg/Platform.c"])
     plat.index.commit("platform: initial")
-    plat.git.submodule("add", str(edk2.resolve()), "edk2")
+    with plat.git.custom_environment(
+        GIT_CONFIG_COUNT="1",
+        GIT_CONFIG_KEY_0="protocol.file.allow",
+        GIT_CONFIG_VALUE_0="always",
+    ):
+        plat.git.submodule("add", str(edk2.resolve()), "edk2")
     plat.index.commit("platform: pin good edk2")
     good_ws = plat.head.commit.hexsha
 
@@ -52,7 +56,10 @@ def _bios_workspace(tmp_path: Path) -> tuple[Path, str, str]:
     nested.index.commit("BIOS-99: ExitBootServices hang")
     plat.git.add("edk2")
 
-    _write(ws / "PlatformPkg" / "AcpiTables" / "Dsdt.asl", "DefinitionBlock (\"DSDT.aml\", \"DSDT\", 2, \"OEM\", \"TBL\", 1) {}\n")
+    _write(
+        ws / "PlatformPkg" / "AcpiTables" / "Dsdt.asl",
+        'DefinitionBlock ("DSDT.aml", "DSDT", 2, "OEM", "TBL", 1) {}\n',
+    )
     plat.git.add("PlatformPkg/AcpiTables/Dsdt.asl")
     plat.index.commit("BIOS-100: ACPI DSDT and edk2 pin bump")
     bad_ws = plat.head.commit.hexsha
