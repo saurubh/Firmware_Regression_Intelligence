@@ -31,6 +31,9 @@ def main() -> int:
     if args.command == "topics":
         return _topics()
 
+    if args.command == "phases":
+        return _phases()
+
     if args.command != "investigate":
         print("Unknown command.")
         return 1
@@ -77,6 +80,7 @@ def _doctor() -> int:
         profile = config.failure_profiles[name]
         print(f"  - {name:16}  domains={len(profile.domains)} keywords={len(profile.keywords)}")
     print(f"Firmware domains: {', '.join(config.domains())}")
+    print(f"Boot phases: {', '.join(p.name for p in config.ordered_phases())}")
     return 0
 
 
@@ -91,6 +95,22 @@ def _topics() -> int:
         if description:
             print(f"      {description}.")
         print(f"      subsystems: {', '.join(profile.domains)}")
+        print()
+    return 0
+
+
+def _phases() -> int:
+    from fri.config import config
+
+    print("Boot phases from CPU out of reset to OS (fri investigate --failure from_reset):")
+    print()
+    for phase in config.ordered_phases():
+        vendors = ", ".join(phase.vendors)
+        print(f"  {phase.order:3}  {phase.name}")
+        print(f"       {phase.edge}")
+        if phase.description:
+            print(f"       {phase.description.split('.')[0].strip()}.")
+        print(f"       vendors: {vendors}")
         print()
     return 0
 

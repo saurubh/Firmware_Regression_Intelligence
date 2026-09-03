@@ -67,6 +67,8 @@ class FailureProfile:
     keywords: list[str] = field(default_factory=list)
     path_patterns: list[str] = field(default_factory=list)
     risk_signals: list[str] = field(default_factory=list)
+    phase: str = ""
+    breadth: str = "narrow"
     related: list[str] = field(default_factory=list)
 
 
@@ -120,6 +122,9 @@ class RegressionCandidate:
     evidence: list[str] = field(default_factory=list)
     hazards: list[str] = field(default_factory=list)
     signal_count: int = 0
+    phases: list[str] = field(default_factory=list)
+    primary_phase: str = "Unknown"
+    vendor: str = "common"
 
 
 @dataclass
@@ -171,6 +176,45 @@ class RegressionStatistics:
 
 
 @dataclass
+class BootPhaseSpec:
+    """One ordered boot phase from CPU reset to OS."""
+
+    name: str
+    order: int = 0
+    vendors: list[str] = field(default_factory=list)
+    edge: str = ""
+    description: str = ""
+    domains: list[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
+    paths: list[str] = field(default_factory=list)
+
+
+@dataclass
+class PhaseFinding:
+    """Aggregated suspicion for one boot phase in the good→bad window."""
+
+    name: str
+    order: int
+    confidence: int
+    strength: float
+    edge: str
+    description: str
+    vendors: list[str] = field(default_factory=list)
+    commits: list[Commit] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TriagePlan:
+    """Where to start debugging between good SHA and failing SHA."""
+
+    start_phase: str = ""
+    start_reason: str = ""
+    vendor_hint: str = "common"
+    phases: list[PhaseFinding] = field(default_factory=list)
+
+
+@dataclass
 class RegressionReport:
     """Complete investigation output."""
 
@@ -184,5 +228,6 @@ class RegressionReport:
     candidates: list[RegressionCandidate] = field(default_factory=list)
     modules: list[ModuleCandidate] = field(default_factory=list)
     bisect: BisectPlan | None = None
+    triage: TriagePlan | None = None
     statistics: RegressionStatistics = field(default_factory=RegressionStatistics)
     generated_at: datetime = field(default_factory=datetime.now)

@@ -49,6 +49,7 @@ class RegressionScorer:
     MEDIUM_CHANGE = 5
     MAX_GENERIC_KEYWORD = 8
     MAX_DIFF_SCORE = 24
+    PHASE_MATCH = 26
     UNRELATED_PENALTY = 12
     DOCS_PENALTY = 25
     COMMENT_PENALTY = 18
@@ -86,11 +87,22 @@ class RegressionScorer:
                 signals += 1
             if risk_hits:
                 signals += 1
-            if not (domain_hits or path_hits or keyword_hits) and commit.domains:
+            if (
+                not (domain_hits or path_hits or keyword_hits)
+                and commit.domains
+                and profile.breadth != "wide"
+            ):
                 score -= self.UNRELATED_PENALTY
                 candidate.reasons.append(
                     "No overlap with the selected failure profile; down-ranked."
                 )
+            if profile.phase and profile.phase != "all":
+                if profile.phase in candidate.phases or profile.phase == candidate.primary_phase:
+                    score += self.PHASE_MATCH
+                    signals += 1
+                    candidate.reasons.append(
+                        f"Commit phase '{candidate.primary_phase}' matches failure '{profile.name}'."
+                    )
 
         hazard_score, hazard_signals = self._score_hazards(candidate, diff, profile)
         score += hazard_score
@@ -258,10 +270,12 @@ class RegressionScorer:
             points = self.HAZARD_HIGH if hazard.severity == "high" else self.HAZARD_MEDIUM
             relevant = (
                 not profile
+                or profile.breadth == "wide"
                 or hazard.category == "generic"
                 or hazard.category == profile_name
                 or hazard.category in profile_domains
                 or (bootish and hazard.category in {"os_boot", "boot", "acpi"})
+                or hazard.category == (profile.phase if profile else "")
             )
             if relevant:
                 if profile and (
@@ -316,7 +330,7 @@ class RegressionScorer:
         if profile is None:
             return True
         name = profile.name.lower()
-        if name in {"os_boot", "boot", "linuxboot", "csm", "generic", "variable"}:
+        if name in {"os_boot", "boot", "linuxboot", "csm", "generic", "variable", "from_reset", "bds"}:
             return True
         return bool({"Boot", "BDS", "OSLoader", "LinuxBoot"} & set(profile.domains))
 

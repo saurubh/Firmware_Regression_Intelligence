@@ -37,6 +37,22 @@ class ConsoleReport:
             print()
             print("Related topics: " + ", ".join(report.related_topics))
 
+        if report.triage and report.triage.phases:
+            print()
+            print("=" * 90)
+            print("BOOT PHASE TRIAGE  (CPU reset → OS)")
+            print("=" * 90)
+            print()
+            if report.triage.start_reason:
+                print(report.triage.start_reason)
+                print()
+            for finding in report.triage.phases:
+                print(
+                    f"  {finding.order:3}  {finding.name:16} {finding.confidence:3}%  "
+                    f"{finding.edge}"
+                )
+            print()
+
         print()
         print("=" * 90)
         print("TOP REGRESSION CANDIDATES")
@@ -55,6 +71,7 @@ class ConsoleReport:
             print(f"     Jira       : {commit.jira}")
             print(f"     Intent     : {commit.intent}")
             print(f"     Domain     : {commit.primary_domain}")
+            print(f"     Phase      : {candidate.primary_phase} ({candidate.vendor})")
             print(f"     Subject    : {commit.subject}")
             if candidate.matched_domains:
                 print("     Domains    : " + ", ".join(candidate.matched_domains))

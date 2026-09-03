@@ -142,6 +142,42 @@ _HAZARD_RULES = (
         "medium",
         re.compile(r"\b(PcdGet.*Enable|FeaturePcd|FIXED_AT_BUILD).*(TRUE|FALSE|0|1)", re.IGNORECASE),
     ),
+    (
+        "Intel FSP-M / MemoryInit",
+        "memory_init",
+        "high",
+        re.compile(r"\b(FspMemoryInit|FSP-M|FspmUpd|MemoryInit)\b", re.IGNORECASE),
+    ),
+    (
+        "Intel FSP-T / TempRamInit",
+        "sec",
+        "high",
+        re.compile(r"\b(TempRamInit|FSP-T|FsptUpd)\b", re.IGNORECASE),
+    ),
+    (
+        "Intel FSP-S / SiliconInit",
+        "silicon_init",
+        "high",
+        re.compile(r"\b(FspSiliconInit|FSP-S|FspsUpd|NotifyPhase)\b", re.IGNORECASE),
+    ),
+    (
+        "Intel Boot Guard / ACM",
+        "reset",
+        "high",
+        re.compile(r"\b(BootGuard|FIT|BPM_|KM_|GETSEC|ACM)\b"),
+    ),
+    (
+        "AMD AGESA callout",
+        "silicon_init",
+        "high",
+        re.compile(r"\bAmdInit(Reset|Early|Post|Env|Mid|Late)\b", re.IGNORECASE),
+    ),
+    (
+        "AMD PSP / BIOS directory",
+        "reset",
+        "high",
+        re.compile(r"\b(PSP|BiosDirectory|DirAddr)\b", re.IGNORECASE),
+    ),
 )
 
 _PCD_RE = re.compile(

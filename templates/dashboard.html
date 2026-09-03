@@ -519,7 +519,58 @@ Related topics: {{ report.related_topics|join(", ") }}
 
 {% endif %}
 
+{% if report.triage and report.triage.phases %}
+
+<div class="section">
+
+<h2>Boot Phase Triage (CPU reset → OS)</h2>
+
+{% if report.triage.start_reason %}
+
+<p>{{ report.triage.start_reason }}</p>
+
+{% endif %}
+
+{% for finding in report.triage.phases %}
+
+<div class="module-card">
+
+<div class="module-header">
+
+<div class="module-name">
+
+{{ finding.order }} · {{ finding.name }}
+
 </div>
+
+<div style="font-size:28px;font-weight:bold;">
+
+{{ finding.confidence }}%
+
+</div>
+
+</div>
+
+<p style="color:var(--muted);margin-top:8px;">
+
+{{ finding.edge }}
+
+</p>
+
+<div class="progress">
+
+<div class="bar" style="width:{{ finding.confidence }}%"></div>
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endif %}
+
 <!-- ===================================================== -->
 <!-- Top Firmware Modules -->
 <!-- ===================================================== -->

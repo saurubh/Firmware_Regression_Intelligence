@@ -15,7 +15,7 @@ PROJECT_NAME = "Firmware Regression Intelligence"
 
 SHORT_NAME = "FRI"
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,6 +28,8 @@ LOG_DIR = ROOT_DIR / "logs"
 TEMPLATE_DIR = ROOT_DIR / "templates"
 
 COMPONENT_MAP = CONFIG_DIR / "component_map.yaml"
+
+BOOT_PHASES = CONFIG_DIR / "boot_phases.yaml"
 
 FAILURE_PROFILE = CONFIG_DIR / "failure_profiles.yaml"
 

@@ -49,4 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
         "topics",
         help="List every regression topic FRI can analyze",
     )
+    subparsers.add_parser(
+        "phases",
+        help="List CPU-reset-to-OS boot phases used for triage",
+    )
     return parser

@@ -163,3 +163,48 @@ Clock:
 Virtualization:
   paths: [vmx, svm, virt, tdx, sev, kvm, hyperv]
   keywords: [VMX, SVM, VT-X, TDX, SEV, SNP, KVM, HYPER-V, VIRTUALIZATION]
+
+SEC:
+  paths: [secmain, seccore, tempram, fspt, fsp-t]
+  keywords: [SEC, TEMPRAM, FSP-T, FSPT, CAR]
+
+PCH:
+  paths: [pch, dmi, lpc, espi]
+  keywords: [PCH, DMI, ESPI, LPC]
+
+IIO:
+  paths: [iio, cha, upi, uncore]
+  keywords: [IIO, CHA, UPI, UNCORE]
+
+TXT:
+  paths: [txt, getsec, tboot, measuredlaunch]
+  keywords: [TXT, GETSEC, SENTER, TBOOT]
+
+AGESA:
+  paths: [agesa, amdagesa, proc/cpu, umc]
+  keywords: [AGESA, AMDINITRESET, AMDINITEARLY, AMDINITPOST, AMDINITENV, AMDINITMID, AMDINITLATE, UMC]
+
+PSP:
+  paths: [/psp/, amdpsp, biosdir]
+  keywords: [PSP, BIOS DIRECTORY, DIRADDR]
+
+SMU:
+  paths: [smu, mp1]
+  keywords: [SMU, MP1]
+
+NBIO:
+  paths: [nbio, gnb, pcie/amd]
+  keywords: [NBIO, GNB]
+
+DF:
+  paths: [/df/, datafabric, fabric]
+  keywords: [DATA FABRIC, DF]
+
+CCP:
+  paths: [ccp, ccpv5]
+  keywords: [CCP]
+
+Recovery:
+  paths: [recovery, topswap, dualbank]
+  keywords: [RECOVERY, TOPSWAP]
+

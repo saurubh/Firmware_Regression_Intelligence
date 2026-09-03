@@ -468,6 +468,41 @@ This is useful because firmware development and debugging are often organized ar
 
 ---
 
+# Boot phases (CPU reset → OS)
+
+FRI triages the firmware Git window from a **good SHA** to a **failing SHA** against the real server UEFI sequence. It does not ingest OS logs.
+
+```text
+reset          CPU out of reset, microcode, FIT / AMD BIOS directory / PSP
+sec            SEC, TempRamInit, FSP-T, Cache-as-RAM
+pei            PEI core, PEIMs, HOBs, PPIs
+memory_init    Intel FSP-M / MRC  |  AMD AGESA AmdInitPost / UMC
+silicon_init   Intel FSP-S / PCH / IIO  |  AMD NBIO / DF / SMU / FCH
+dxe            DXE dispatcher, firmware volumes
+bds            Boot manager, consoles, ReadyToBoot
+os_handoff     ExitBootServices, ACPI/SMBIOS/IOMMU, OS loader
+runtime        UEFI runtime after the OS is running
+resume         S3 / S0ix boot script
+recovery       Recovery FV / dual-bank / capsule
+```
+
+When the hang is “no boot after flashing” and the phase is unknown:
+
+```bash
+fri phases
+
+fri investigate \
+    --repo ~/firmware-repo \
+    --good GOOD_SHA \
+    --bad BAD_SHA \
+    --failure from_reset \
+    --html --json
+```
+
+The report’s **Boot Phase Triage** block says where to start (for example memory_init on Intel FSP-M vs AGESA on AMD). Narrow with `--failure memory_init`, `sec`, `amd_psp`, `intel_bootguard`, and so on.
+
+---
+
 # Supported Failure Types
 
 Use `fri topics` to list every profile. Built-in `--failure` values include:

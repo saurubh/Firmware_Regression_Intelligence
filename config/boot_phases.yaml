@@ -1,0 +1,211 @@
+# Ordered firmware boot phases: CPU out of reset → OS.
+#
+# Intel server UEFI: FIT/ACM/Boot Guard → SEC → FSP-T → PEI → FSP-M/MRC →
+# FSP-S/PCH/IIO → DXE → BDS → ExitBootServices → OS.
+#
+# AMD server UEFI: PSP directory → SEC → AGESA InitReset/Early → PEI →
+# AGESA InitPost (memory/UMC) → InitEnv/Mid (NBIO/DF/FCH) → DXE → BDS → OS.
+#
+# FRI still only reads the firmware Git repo. Phases triage *which stage*
+# in that repo is implicated between good SHA and bad SHA.
+
+reset:
+  order: 10
+  vendors: [intel, amd, common]
+  edge: CPU is out of reset. Reset vector, microcode, FIT/PSP directory.
+  description: >
+    Failures immediately after RESET# deassert: no SPI fetch, bad reset
+    vector, microcode load, FIT type-0/1, AMD BIOS directory / PSP entry.
+  domains: [CPU, FIT, ME, PSP, Boot]
+  keywords:
+    - reset vector
+    - microcode
+    - uop
+    - fit
+    - bios directory
+    - psp entry
+    - reset#
+    - INIT#
+  paths: [resetvector, microcode, seccore, fit, psp]
+
+sec:
+  order: 20
+  vendors: [intel, amd, common]
+  edge: SEC / Temp RAM / Cache-as-RAM before PEI.
+  description: >
+    SEC core, TempRamInit (Intel FSP-T), CAR, early debug UART. Hang
+    before PEI entry, no serial, no progress codes.
+  domains: [Boot, FSP, SEC, Serial]
+  keywords:
+    - sec
+    - seccore
+    - tempram
+    - tempraminit
+    - fsp-t
+    - car
+    - cache as ram
+  paths: [secmain, seccore, tempram, fspt, fsp-t]
+
+pei:
+  order: 30
+  vendors: [intel, amd, common]
+  edge: PEI / PEIMs / HOBs before permanent memory is usable.
+  description: >
+    PEI core, PPI install, early silicon PEIMs, HOBs. Hang at PEI,
+    missing PPI, bad HOB, progress-code stall in PEI.
+  domains: [PEI, Boot, Platform, FSP, AGESA]
+  keywords:
+    - pei
+    - peim
+    - peicore
+    - hob
+    - ppi
+    - peiservices
+  paths: [pei, peim, peicore, peiservices]
+
+memory_init:
+  order: 40
+  vendors: [intel, amd, common]
+  edge: DRAM training — the most common "no boot after reset" silicon gate.
+  description: >
+    Intel FSP-M / MRC / RMT / SPD / DDR5 training. AMD AGESA AmdInitPost
+    / UMC / DIMM population. Hang, memory missing, training timeout,
+    cold-boot only vs warm-boot.
+  domains: [Memory, FSP, AGESA, NUMA, RAS]
+  keywords:
+    - fsp-m
+    - fspm
+    - mrc
+    - rmt
+    - memoryinit
+    - amdinitpost
+    - umc
+    - dimm
+    - spd
+    - ddr5
+    - training
+  paths: [mrc, fspm, fsp-m, meminit, umc, agesa]
+
+silicon_init:
+  order: 50
+  vendors: [intel, amd, common]
+  edge: Uncore / IIO / PCH / NBIO / DF / SMU after DRAM is up.
+  description: >
+    Intel FSP-S / PCH / IIO / UPI / CHA / DMI. AMD AmdInitEnv/Mid, NBIO,
+    data fabric, FCH, SMU. PCIe root complexes not ready, hang after
+    memory but before DXE.
+  domains: [FSP, AGESA, PCIe, CPU, PCH, NBIO, DF, SMU, Platform]
+  keywords:
+    - fsp-s
+    - fsps
+    - siliconinit
+    - notifyphase
+    - pch
+    - iio
+    - upi
+    - nbio
+    - data fabric
+    - smu
+    - amdinitenv
+    - amdinitmid
+  paths: [fsps, fsp-s, pch, iio, upi, nbio, smu, fch, agesa]
+
+dxe:
+  order: 60
+  vendors: [intel, amd, common]
+  edge: DXE core, dispatcher, FV, protocol database.
+  description: >
+    DXE IPL, dispatcher, firmware volumes, protocol install. Missing
+    DXE driver, assert in DXE, no BDS, EndOfDxe not reached.
+  domains: [DXE, Boot, Platform]
+  keywords:
+    - dxe
+    - dxecore
+    - dispatcher
+    - endofdxe
+    - firmware volume
+    - dxeipl
+  paths: [dxe, dxecore, dxeiplex, dxedriver]
+
+bds:
+  order: 70
+  vendors: [intel, amd, common]
+  edge: Boot Device Selection — consoles, boot options, ReadyToBoot.
+  description: >
+    BDS, Boot Manager, GOP/serial consoles, BootOrder, ReadyToBoot.
+    POST complete but no boot menu, no video, wrong boot option.
+  domains: [BDS, Graphics, Serial, Variable, OSLoader]
+  keywords:
+    - bds
+    - bootmanager
+    - bootorder
+    - readytoboot
+    - consplitter
+    - gop
+  paths: [bds, bdsdxe, ufeibootmanager, bootmanager]
+
+os_handoff:
+  order: 80
+  vendors: [intel, amd, common]
+  edge: ExitBootServices through OS kernel/EFI stub/GRUB/LinuxBoot.
+  description: >
+    Memory map, ACPI/SMBIOS/IOMMU tables, ExitBootServices, runtime
+    virtual-address map, OS loader. Firmware reached BDS; OS fails.
+  domains: [OSLoader, ACPI, SMBIOS, IOMMU, LinuxBoot, Variable, Memory, PCIe]
+  keywords:
+    - exitbootservices
+    - getmemorymap
+    - setvirtualaddressmap
+    - acpi
+    - dmar
+    - ivrs
+    - grub
+    - linuxboot
+    - efistub
+  paths: [bdsdxe, acpi, smbios, iommu, vtd, linuxboot, osloader]
+
+runtime:
+  order: 90
+  vendors: [intel, amd, common]
+  edge: UEFI runtime after SetVirtualAddressMap (OS running).
+  description: >
+    Runtime services, variable runtime, ResetSystem, capsules at OS
+    runtime. OS boots then SetVariable/reset/capsule fails.
+  domains: [Variable, Capsule, SMM]
+  keywords:
+    - runtime
+    - setvirtualaddressmap
+    - resetsystem
+    - variableruntime
+  paths: [variableruntime, capsule, runtime]
+
+resume:
+  order: 95
+  vendors: [intel, amd, common]
+  edge: S3/S0ix resume boot-script, not cold reset.
+  description: >
+    ACPI boot script, S3 PEI, resume from RAM. Cold boot works, resume
+    hangs or OS panics on wake.
+  domains: [Resume, ACPI, Memory, Variable]
+  keywords:
+    - s3
+    - resume
+    - bootscript
+    - s0ix
+  paths: [s3, resume, bootscript, s3savestate]
+
+recovery:
+  order: 15
+  vendors: [intel, amd, common]
+  edge: Recovery / top-swap / capsule-on-disk / forced recovery FV.
+  description: >
+    Recovery firmware volume, dual-bank, capsule update brick, top-swap.
+    Platform stuck in recovery or loops updating.
+  domains: [Capsule, FIT, Boot, Security]
+  keywords:
+    - recovery
+    - top swap
+    - forcedrecovery
+    - capsule
+    - dual bank
+  paths: [recovery, capsule, topswap]

@@ -26,6 +26,7 @@ class JsonReport:
             "profile_description": report.profile_description,
             "related_topics": report.related_topics,
             "covered_topics": report.covered_topics,
+            "triage": None,
             "generated_at": report.generated_at.isoformat(),
             "statistics": {
                 "total_commits": report.statistics.total_commits,
@@ -79,6 +80,9 @@ class JsonReport:
                     "matched_files": candidate.matched_files,
                     "matched_paths": candidate.matched_paths,
                     "hazards": candidate.hazards,
+                    "phases": candidate.phases,
+                    "primary_phase": candidate.primary_phase,
+                    "vendor": candidate.vendor,
                     "reasons": candidate.reasons,
                     "evidence": candidate.evidence,
                 }
@@ -97,6 +101,26 @@ class JsonReport:
                     "reasons": module.reasons,
                 }
             )
+
+        if report.triage is not None:
+            data["triage"] = {
+                "start_phase": report.triage.start_phase,
+                "start_reason": report.triage.start_reason,
+                "vendor_hint": report.triage.vendor_hint,
+                "phases": [
+                    {
+                        "name": finding.name,
+                        "order": finding.order,
+                        "confidence": finding.confidence,
+                        "strength": finding.strength,
+                        "edge": finding.edge,
+                        "description": finding.description,
+                        "vendors": finding.vendors,
+                        "commits": [commit.short_sha for commit in finding.commits],
+                    }
+                    for finding in report.triage.phases
+                ],
+            }
 
         if report.bisect is not None:
             data["bisect"] = {

@@ -10,6 +10,7 @@ RegressionScorer.
 
 from __future__ import annotations
 
+from fri.analyzer.phase_analyzer import PhaseAnalyzer
 from fri.config import config
 from fri.constants import LOW_CONFIDENCE
 from fri.models import Commit, DiffEvidence, RegressionCandidate
@@ -22,6 +23,7 @@ class CandidateEngine:
     def __init__(self) -> None:
         self.failure_profiles = config.failure_profiles
         self.scorer = RegressionScorer()
+        self.phases = PhaseAnalyzer()
 
     def evaluate(
         self,
@@ -31,6 +33,7 @@ class CandidateEngine:
     ) -> RegressionCandidate:
         profile = self.failure_profiles.get(failure.lower())
         candidate = RegressionCandidate(commit=commit)
+        candidate = self.phases.tag(candidate, diff)
         return self.scorer.score(candidate=candidate, diff=diff, profile=profile)
 
     def rank(

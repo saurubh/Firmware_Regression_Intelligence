@@ -14,6 +14,7 @@ from fri.analyzer.bisect_planner import BisectPlanner
 from fri.analyzer.candidate_engine import CandidateEngine
 from fri.analyzer.diff_analyzer import DiffAnalyzer
 from fri.analyzer.module_analyzer import ModuleAnalyzer
+from fri.analyzer.triage import BootTriage
 from fri.classifier.classifier import FirmwareClassifier
 from fri.collector.git_collector import GitCollector
 from fri.config import config
@@ -31,6 +32,7 @@ class InvestigationEngine:
         self.candidates = CandidateEngine()
         self.modules = ModuleAnalyzer()
         self.bisect = BisectPlanner()
+        self.triage = BootTriage()
 
     def investigate(self, good, bad, failure) -> RegressionReport:
         started = time.perf_counter()
@@ -64,6 +66,7 @@ class InvestigationEngine:
         report.candidates = visible or ranked[:10]
 
         report.modules = self.modules.analyze(report.candidates)
+        report.triage = self.triage.plan(report.candidates)
         report.bisect = self.bisect.plan(
             good_sha=good,
             bad_sha=bad,

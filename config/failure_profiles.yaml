@@ -55,6 +55,20 @@ boot:
     - assert
     - stall
     - watchdog
+  phase: all
+  breadth: wide
+  related:
+    - from_reset
+    - reset
+    - sec
+    - pei
+    - memory_init
+    - silicon_init
+    - dxe
+    - bds
+    - os_boot
+    - fsp
+    - amd_agesa
 
 os_boot:
   description: >
@@ -62,6 +76,7 @@ os_boot:
     reaches BDS but Linux, Windows, LinuxBoot, GRUB, systemd-boot,
     or the EFI stub fails to start, panics early, or cannot see
     memory, ACPI, disks, or consoles.
+  phase: os_handoff
   subsystems:
     - Boot
     - BDS
@@ -1229,4 +1244,428 @@ virtualization:
     - enable
     - default
     - pcd
+
+from_reset:
+  description: >
+    Unknown failure from CPU-out-of-reset through OS. Use this when the
+    platform does not boot after a BIOS change and the phase is unknown.
+    FRI triages every boot phase (Intel FSP and AMD AGESA/PSP) between
+    the good SHA and the failing SHA.
+  phase: all
+  breadth: wide
+  subsystems:
+    - CPU
+    - FIT
+    - ME
+    - PSP
+    - Boot
+    - SEC
+    - PEI
+    - Memory
+    - FSP
+    - AGESA
+    - PCH
+    - IIO
+    - NBIO
+    - DF
+    - SMU
+    - DXE
+    - BDS
+    - ACPI
+    - OSLoader
+    - Platform
+  keywords:
+    - hang
+    - no boot
+    - post
+    - reset
+    - pei
+    - dxe
+    - bds
+    - fsp
+    - agesa
+    - psp
+    - timeout
+  path_patterns:
+    - secmain
+    - pei
+    - fsp
+    - agesa
+    - bds
+    - dxe
+  risk_signals:
+    - timeout
+    - assert
+    - hang
+    - pcd
+    - default
+    - upd
+  related:
+    - reset
+    - sec
+    - pei
+    - memory_init
+    - silicon_init
+    - dxe
+    - bds
+    - os_boot
+    - resume
+    - recovery
+
+reset:
+  description: >
+    CPU out of reset / reset vector / microcode / FIT or AMD BIOS directory.
+    No fetch from SPI, immediate reboot, or no SEC entry.
+  phase: reset
+  subsystems:
+    - CPU
+    - FIT
+    - ME
+    - PSP
+    - Boot
+  keywords:
+    - reset vector
+    - microcode
+    - fit
+    - bios directory
+    - psp
+  path_patterns:
+    - resetvector
+    - microcode
+    - fit
+    - psp
+  risk_signals:
+    - fit
+    - microcode
+    - directory
+
+sec:
+  description: >
+    SEC / TempRamInit / FSP-T / Cache-as-RAM. Hang before PEI, no CAR,
+    early UART dead.
+  phase: sec
+  subsystems:
+    - SEC
+    - Boot
+    - FSP
+    - Serial
+  keywords:
+    - sec
+    - tempram
+    - fsp-t
+    - fspt
+    - car
+    - seccore
+  path_patterns:
+    - secmain
+    - seccore
+    - tempram
+    - fspt
+  risk_signals:
+    - tempram
+    - timeout
+    - uart
+
+pei:
+  description: >
+    PEI core / PEIMs / HOBs / PPIs. Hang in PEI, missing PPI, bad HOB.
+  phase: pei
+  subsystems:
+    - PEI
+    - Boot
+    - Platform
+    - FSP
+    - AGESA
+  keywords:
+    - pei
+    - peim
+    - hob
+    - ppi
+    - peicore
+  path_patterns:
+    - pei
+    - peim
+    - peicore
+  risk_signals:
+    - hob
+    - ppi
+    - assert
+    - timeout
+
+memory_init:
+  description: >
+    DRAM training. Intel FSP-M/MRC/RMT or AMD AGESA AmdInitPost/UMC.
+    Most common silicon no-boot after reset.
+  phase: memory_init
+  subsystems:
+    - Memory
+    - FSP
+    - AGESA
+    - NUMA
+    - RAS
+  keywords:
+    - fsp-m
+    - fspm
+    - mrc
+    - rmt
+    - amdinitpost
+    - umc
+    - dimm
+    - spd
+    - ddr5
+    - training
+  path_patterns:
+    - mrc
+    - fspm
+    - meminit
+    - umc
+    - agesa
+  risk_signals:
+    - training
+    - timeout
+    - spd
+    - default
+    - upd
+
+silicon_init:
+  description: >
+    After DRAM: Intel FSP-S/PCH/IIO/UPI or AMD InitEnv/NBIO/DF/SMU/FCH.
+  phase: silicon_init
+  subsystems:
+    - FSP
+    - AGESA
+    - PCIe
+    - PCH
+    - IIO
+    - NBIO
+    - DF
+    - SMU
+    - CPU
+    - Platform
+  keywords:
+    - fsp-s
+    - fsps
+    - siliconinit
+    - pch
+    - iio
+    - nbio
+    - smu
+    - amdinitenv
+  path_patterns:
+    - fsps
+    - pch
+    - iio
+    - nbio
+    - smu
+    - agesa
+  risk_signals:
+    - notifyphase
+    - default
+    - upd
+    - timeout
+
+dxe:
+  description: >
+    DXE dispatcher / FV / protocols. PEI completed; BDS never reached.
+  phase: dxe
+  subsystems:
+    - DXE
+    - Boot
+    - Platform
+  keywords:
+    - dxe
+    - dispatcher
+    - endofdxe
+    - dxecore
+  path_patterns:
+    - dxe
+    - dxecore
+    - dxeiplex
+  risk_signals:
+    - assert
+    - dispatcher
+    - timeout
+
+bds:
+  description: >
+    BDS / Boot Manager / consoles / ReadyToBoot. POST lives, OS loader
+    is not started.
+  phase: bds
+  subsystems:
+    - BDS
+    - Graphics
+    - Serial
+    - Variable
+    - OSLoader
+  keywords:
+    - bds
+    - bootmanager
+    - bootorder
+    - readytoboot
+    - gop
+  path_patterns:
+    - bds
+    - bdsdxe
+    - ufeibootmanager
+  risk_signals:
+    - bootorder
+    - timeout
+    - default
+
+runtime:
+  description: >
+    UEFI runtime after OS is running (SetVariable, ResetSystem, capsule).
+  phase: runtime
+  subsystems:
+    - Variable
+    - Capsule
+    - SMM
+  keywords:
+    - runtime
+    - setvirtualaddressmap
+    - resetsystem
+    - variableruntime
+  path_patterns:
+    - variableruntime
+    - runtime
+    - capsule
+  risk_signals:
+    - runtime
+    - virtualaddress
+
+recovery:
+  description: >
+    Recovery FV, dual-bank, top-swap, capsule brick or recovery loop.
+  phase: recovery
+  subsystems:
+    - Recovery
+    - Capsule
+    - FIT
+    - Boot
+    - Security
+  keywords:
+    - recovery
+    - topswap
+    - dual bank
+    - forcedrecovery
+    - capsule
+  path_patterns:
+    - recovery
+    - capsule
+    - topswap
+  risk_signals:
+    - recovery
+    - capsule
+    - update
+
+intel_bootguard:
+  description: >
+    Intel Boot Guard / ACM / BPM / KM / IBB / FIT chain of trust.
+    CPU reset then immediate TXT/Boot Guard shutdown.
+  phase: reset
+  subsystems:
+    - FIT
+    - Security
+    - TXT
+    - ME
+    - Boot
+  keywords:
+    - bootguard
+    - acm
+    - bpm
+    - km
+    - ibb
+    - fit
+    - txt
+    - getsec
+  path_patterns:
+    - fit
+    - acm
+    - bootguard
+    - txt
+  risk_signals:
+    - acm
+    - bpm
+    - km
+    - policy
+
+amd_psp:
+  description: >
+    AMD PSP / BIOS directory / CCP. No x86 fetch after PSP, or PSP
+    abort before AGESA.
+  phase: reset
+  subsystems:
+    - PSP
+    - CCP
+    - Security
+    - Boot
+  keywords:
+    - psp
+    - bios directory
+    - ccp
+    - diraddr
+  path_patterns:
+    - /psp/
+    - amdpsp
+    - ccp
+  risk_signals:
+    - psp
+    - directory
+    - timeout
+
+amd_agesa:
+  description: >
+    AMD AGESA callouts (InitReset through InitLate). Memory, NBIO, DF,
+    FCH, SMU silicon sequence on EPYC.
+  phase: silicon_init
+  subsystems:
+    - AGESA
+    - Memory
+    - NBIO
+    - DF
+    - SMU
+    - CPU
+    - PCIe
+  keywords:
+    - agesa
+    - amdinitreset
+    - amdinitearly
+    - amdinitpost
+    - amdinitenv
+    - amdinitmid
+  path_patterns:
+    - agesa
+    - umc
+    - nbio
+    - smu
+  risk_signals:
+    - agesa
+    - timeout
+    - default
+
+txt:
+  description: >
+    Intel TXT / GETSEC / measured launch / tboot. Hang or shutdown
+    in SENTER.
+  phase: dxe
+  subsystems:
+    - TXT
+    - Security
+    - TPM
+    - MeasuredBoot
+  keywords:
+    - txt
+    - getsec
+    - senter
+    - tboot
+    - measured launch
+  path_patterns:
+    - txt
+    - tboot
+    - getsec
+  risk_signals:
+    - txt
+    - acm
+    - policy
+
 
