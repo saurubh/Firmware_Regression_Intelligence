@@ -68,20 +68,32 @@ def main() -> int:
         engine = InvestigationEngine(args.repo)
         if args.manifest:
             logger.info("Manifest     : %s", args.manifest)
-            report = engine.investigate_manifest(args.manifest, args.failure)
+            report = engine.investigate_manifest(
+                args.manifest, args.failure, workers=args.workers, fast=args.fast
+            )
         elif args.gitman:
             logger.info("gitman.yml   : %s", args.gitman)
             logger.info("Good Build   : %s", args.good)
             logger.info("Bad Build    : %s", args.bad)
             report = engine.investigate_gitman(
-                args.gitman, args.good, args.bad, args.failure
+                args.gitman,
+                args.good,
+                args.bad,
+                args.failure,
+                workers=args.workers,
+                fast=args.fast,
             )
         elif args.workspace:
             logger.info("Workspace    : %s", args.workspace)
             logger.info("Good Build   : %s", args.good)
             logger.info("Bad Build    : %s", args.bad)
             report = engine.investigate_workspace(
-                args.workspace, args.good, args.bad, args.failure
+                args.workspace,
+                args.good,
+                args.bad,
+                args.failure,
+                workers=args.workers,
+                fast=args.fast,
             )
         else:
             logger.info("Repository   : %s", args.repo)
@@ -91,6 +103,8 @@ def main() -> int:
                 good=args.good,
                 bad=args.bad,
                 failure=args.failure,
+                workers=args.workers,
+                fast=args.fast,
             )
         ConsoleReport().render(report, top=args.top)
         if args.html:

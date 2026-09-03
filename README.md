@@ -747,6 +747,23 @@ Missing clones listed only in gitman.yml show as `missing`. FRI does not clone `
 
 `fri pins --gitman` only resolves tags. `investigate` then walks each **changed** window in that same order. The first listing (`Listed 215 commits in this repo`) is expected and does not mean Edk2/Intel were skipped.
 
+### Speed (v2.8+)
+
+FRI spends most time on **per-commit `git diff`**. v2.8 speeds this up in three ways:
+
+1. **Batch path listing** — one `git log --name-only` per repo instead of one `git diff-tree` per commit.
+2. **Parallel workers** — `--workers 4` or config `analysis.workers` (default **4**) analyze commits concurrently within each repo.
+3. **Binary-only skip** — commits that touch only `.fd`, `.bin`, `.efi`, etc. skip the diff; message and paths still score.
+
+For a long Birch Stream run, add **`--fast`** (parallel + binary skip):
+
+```bash
+fri investigate --gitman ~/BHS_2026/birchstream-ih/gitman.yml \
+  --good '...' --bad '...' --failure os_boot --fast --top 20 --html --json
+```
+
+Tune in `config/config.yaml`: `analysis.workers`, `git.list_timeout_sec`, `git.diff_timeout_sec`.
+
 ## 4. Explicit pin manifest
 
 When repos are siblings (not submodules), or you already know the SHAs from a build database:

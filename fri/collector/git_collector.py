@@ -16,8 +16,10 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 
 from fri.collector.build_resolver import BuildResolver
+from fri.config import config
 from fri.logger import logger
 from fri.models import Commit
+from fri.utils.git_batch import parse_name_only_log
 
 SOURCE_SUFFIXES = {
     ".c",
@@ -51,10 +53,9 @@ SOURCE_SUFFIXES = {
     ".md",
 }
 
-DIFF_TIMEOUT_SEC = 15
-PATH_TIMEOUT_SEC = 20
-MAX_SOURCE_PATHS = 120
-MAX_DIFF_BYTES = 1_000_000
+
+def _git_settings() -> dict:
+    return config.settings.get("git") or {}
 
 
 def _decode_git_bytes(data: bytes | None) -> str:
@@ -66,6 +67,10 @@ def _decode_git_bytes(data: bytes | None) -> str:
 def _is_source(path: str) -> bool:
     suffix = Path(path).suffix.lower()
     return suffix in SOURCE_SUFFIXES
+
+
+def has_source_paths(paths: list[str]) -> bool:
+    return any(_is_source(path) for path in paths)
 
 
 class GitCollector:
@@ -94,6 +99,13 @@ class GitCollector:
             raise RuntimeError(
                 f"{repo_path} is not a valid Git repository."
             ) from err
+
+        git_cfg = _git_settings()
+        self.diff_timeout_sec = int(git_cfg.get("diff_timeout_sec", 15))
+        self.path_timeout_sec = int(git_cfg.get("path_timeout_sec", 20))
+        self.list_timeout_sec = int(git_cfg.get("list_timeout_sec", 180))
+        self.max_source_paths = int(git_cfg.get("max_source_paths", 120))
+        self.max_diff_bytes = int(git_cfg.get("max_diff_bytes", 1_000_000))
 
         #
         # Build resolver
@@ -127,6 +139,13 @@ class GitCollector:
             bad[:8],
         )
 
+        path_map, batch_ok = self._batch_changed_paths(good, bad)
+        if batch_ok:
+            logger.info(
+                "Batch path listing: %d commit(s) with file lists in one git log.",
+                len(path_map),
+            )
+
         commits: list[Commit] = []
 
         for index, git_commit in enumerate(
@@ -135,6 +154,7 @@ class GitCollector:
         ):
             if index % 50 == 0:
                 logger.info("  still listing: %d commits...", index)
+            files = path_map.get(git_commit.hexsha, []) if batch_ok else []
             commits.append(
                 Commit(
                     sha=git_commit.hexsha,
@@ -143,7 +163,7 @@ class GitCollector:
                     email=git_commit.author.email,
                     date=datetime.fromtimestamp(git_commit.committed_date),
                     message=git_commit.message.strip(),
-                    files=[],
+                    files=files,
                     insertions=0,
                     deletions=0,
                     is_merge_commit=(len(git_commit.parents) > 1),
@@ -209,13 +229,15 @@ class GitCollector:
     # ======================================================
 
     def changed_paths(self, commit: Commit) -> list[str]:
+        if commit.files:
+            return list(commit.files)
         git_commit = commit.git_object
         if git_commit is None:
             return []
         try:
             output = self._git(
                 ["diff-tree", "-r", "--name-only", "--no-commit-id", commit.sha],
-                timeout=PATH_TIMEOUT_SEC,
+                timeout=self.path_timeout_sec,
             )
         except subprocess.TimeoutExpired:
             logger.warning("git diff-tree timed out for %s", commit.short_sha)
@@ -231,7 +253,7 @@ class GitCollector:
         if git_commit is None or not git_commit.parents:
             return ""
         parent = git_commit.parents[0].hexsha
-        sources = [path for path in commit.files if _is_source(path)][:MAX_SOURCE_PATHS]
+        sources = [path for path in commit.files if _is_source(path)][:self.max_source_paths]
         if not sources:
             return ""
         stop = threading.Event()
@@ -247,22 +269,45 @@ class GitCollector:
         try:
             output = self._git(
                 ["diff", "--unified=0", parent, commit.sha, "--", *sources],
-                timeout=DIFF_TIMEOUT_SEC,
+                timeout=self.diff_timeout_sec,
             )
         except subprocess.TimeoutExpired:
             logger.warning(
                 "git diff timed out after %ss for %s (%d source files); skipping blob",
-                DIFF_TIMEOUT_SEC,
+                self.diff_timeout_sec,
                 commit.short_sha,
                 len(sources),
             )
             return ""
         finally:
             stop.set()
-        if len(output) > MAX_DIFF_BYTES:
+        if len(output) > self.max_diff_bytes:
             logger.info("Truncating diff for %s", commit.short_sha)
-            return output[:MAX_DIFF_BYTES]
+            return output[:self.max_diff_bytes]
         return output
+
+    def _batch_changed_paths(self, good: str, bad: str) -> tuple[dict[str, list[str]], bool]:
+        revision = f"{good}..{bad}"
+        try:
+            output = self._git(
+                [
+                    "log",
+                    "--reverse",
+                    "--pretty=format:COMMIT:%H",
+                    "--name-only",
+                    revision,
+                ],
+                timeout=self.list_timeout_sec,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                "Batch git log timed out after %ss; using per-commit path listing.",
+                self.list_timeout_sec,
+            )
+            return {}, False
+        if not output.strip():
+            return {}, False
+        return parse_name_only_log(output), True
 
     def _git(self, args: list[str], timeout: int) -> str:
         proc = subprocess.Popen(

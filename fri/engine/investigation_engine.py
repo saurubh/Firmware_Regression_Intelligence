@@ -9,7 +9,10 @@ or a multi-repo BIOS workspace (submodules / pin-sets).
 
 from __future__ import annotations
 
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 from fri.analyzer.bisect_planner import BisectPlanner
 from fri.analyzer.candidate_engine import CandidateEngine
@@ -17,12 +20,13 @@ from fri.analyzer.diff_analyzer import DiffAnalyzer
 from fri.analyzer.module_analyzer import ModuleAnalyzer
 from fri.analyzer.triage import BootTriage
 from fri.classifier.classifier import FirmwareClassifier
-from fri.collector.git_collector import GitCollector
+from fri.collector.git_collector import GitCollector, has_source_paths
 from fri.collector.workspace import WorkspaceCollector
 from fri.config import config
 from fri.constants import HIGH_CONFIDENCE
 from fri.logger import logger
 from fri.models import (
+    Commit,
     RegressionCandidate,
     RegressionReport,
     RegressionStatistics,
@@ -31,6 +35,12 @@ from fri.models import (
 )
 from fri.parser.commit_parser import CommitParser
 from fri.utils.progress import ProgressBar
+
+
+@dataclass
+class AnalysisOptions:
+    workers: int = 1
+    skip_binary_only_diffs: bool = True
 
 
 class InvestigationEngine:
@@ -45,7 +55,7 @@ class InvestigationEngine:
         self.triage = BootTriage()
         self.workspace = WorkspaceCollector()
 
-    def investigate(self, good, bad, failure) -> RegressionReport:
+    def investigate(self, good, bad, failure, **kwargs) -> RegressionReport:
         if not self.repo:
             raise RuntimeError("Single-repo investigate() needs a repository path.")
         plan = WorkspacePlan(
@@ -61,30 +71,37 @@ class InvestigationEngine:
                 )
             ],
         )
-        return self.investigate_plan(plan, failure)
+        return self.investigate_plan(plan, failure, **kwargs)
 
-    def investigate_workspace(self, workspace, good, bad, failure) -> RegressionReport:
+    def investigate_workspace(self, workspace, good, bad, failure, **kwargs) -> RegressionReport:
         logger.info("Resolving the same good/bad tags in every Git repo (then gitlinks)...")
         plan = self.workspace.plan_from_workspace(workspace, good, bad)
         moved = sum(1 for item in plan.deltas if item.status == "changed")
         logger.info("Pin-set: %d repo(s) moved of %d listed.", moved, len(plan.deltas))
-        return self.investigate_plan(plan, failure)
+        return self.investigate_plan(plan, failure, **kwargs)
 
-    def investigate_manifest(self, manifest, failure) -> RegressionReport:
+    def investigate_manifest(self, manifest, failure, **kwargs) -> RegressionReport:
         plan = self.workspace.plan_from_manifest(manifest)
-        return self.investigate_plan(plan, failure)
+        return self.investigate_plan(plan, failure, **kwargs)
 
-    def investigate_gitman(self, gitman, good, bad, failure) -> RegressionReport:
+    def investigate_gitman(self, gitman, good, bad, failure, **kwargs) -> RegressionReport:
         logger.info("Reading gitman.yml names, then walking the tree for other Git repos...")
         plan = self.workspace.plan_from_gitman(gitman, good, bad)
         moved = sum(1 for item in plan.deltas if item.status == "changed")
         logger.info("Pin-set: %d repo(s) moved of %d listed.", moved, len(plan.deltas))
-        return self.investigate_plan(plan, failure)
+        return self.investigate_plan(plan, failure, **kwargs)
 
-    def investigate_plan(self, plan: WorkspacePlan, failure) -> RegressionReport:
+    def investigate_plan(
+        self,
+        plan: WorkspacePlan,
+        failure,
+        workers: int | None = None,
+        fast: bool = False,
+    ) -> RegressionReport:
         started = time.perf_counter()
         failure_key = failure.lower()
         profile = config.get_failure_profile(failure_key)
+        options = _analysis_options(workers=workers, fast=fast)
 
         report = RegressionReport(
             good_sha=plan.good_label,
@@ -106,6 +123,8 @@ class InvestigationEngine:
             len(windows),
             ", ".join(window.name for window in windows) or "(none)",
         )
+        if options.workers > 1:
+            logger.info("Parallel workers: %d", options.workers)
         if len(windows) == 1:
             logger.warning(
                 "Only 1 repo window (%s). Nested clones such as Edk2, Intel, "
@@ -137,44 +156,63 @@ class InvestigationEngine:
                 len(commits),
             )
             bar = ProgressBar(f"{repo_index}/{len(windows)} {window.name}", len(commits))
-            for index, commit in enumerate(commits, start=1):
-                try:
-                    bar.update(index, f"files {commit.short_sha}")
-                    commit.repo_name = window.name
-                    commit.repo_path = window.path
-                    commit.files = collector.changed_paths(commit)
-                    bar.update(
-                        index,
-                        f"diff {commit.short_sha} ({len(commit.files)} files)",
-                    )
-                    diff_text = collector.get_diff(
-                        commit,
-                        heartbeat=lambda detail, i=index, progress=bar: progress.update(
-                            i, detail
-                        ),
-                    )
-                    diff = self.diff.analyze(diff_text)
-                    if not commit.files and diff.modified_files:
-                        commit.files = diff.modified_files
-                    commit.insertions = diff.added_lines
-                    commit.deletions = diff.removed_lines
-                    commit = self.parser.parse(commit)
-                    commit = self.classifier.classify(commit)
-                    candidate = self.candidates.evaluate(commit, failure_key, diff)
-                    candidate.evidence.insert(0, f"Repository: {window.name}")
-                    candidate.reasons.insert(
-                        0,
-                        f"Change is in '{window.name}' ({window.good_sha[:8]}..{window.bad_sha[:8]}).",
-                    )
-                    regression_candidates.append(candidate)
-                    all_commits.append(commit)
-                except Exception as exc:
-                    logger.warning(
-                        "Skipping %s %s: %s",
-                        window.name,
-                        commit.short_sha,
-                        exc,
-                    )
+            if options.workers <= 1:
+                for index, commit in enumerate(commits, start=1):
+                    try:
+                        result = self._process_commit(
+                            window,
+                            collector,
+                            commit,
+                            failure_key,
+                            options,
+                            bar=bar,
+                            index=index,
+                        )
+                        if result is None:
+                            continue
+                        commit, candidate = result
+                        regression_candidates.append(candidate)
+                        all_commits.append(commit)
+                    except Exception as exc:
+                        logger.warning(
+                            "Skipping %s %s: %s",
+                            window.name,
+                            commit.short_sha,
+                            exc,
+                        )
+                        bar.tick(f"skip {commit.short_sha}")
+            else:
+                with ThreadPoolExecutor(max_workers=options.workers) as pool:
+                    futures = {
+                        pool.submit(
+                            self._process_commit,
+                            window,
+                            collector,
+                            commit,
+                            failure_key,
+                            options,
+                        ): commit
+                        for commit in commits
+                    }
+                    for future in as_completed(futures):
+                        commit = futures[future]
+                        try:
+                            result = future.result()
+                            if result is None:
+                                bar.tick(f"skip {commit.short_sha}")
+                                continue
+                            done_commit, candidate = result
+                            regression_candidates.append(candidate)
+                            all_commits.append(done_commit)
+                            bar.tick(f"done {done_commit.short_sha}")
+                        except Exception as exc:
+                            logger.warning(
+                                "Skipping %s %s: %s",
+                                window.name,
+                                commit.short_sha,
+                                exc,
+                            )
+                            bar.tick(f"skip {commit.short_sha}")
             bar.close()
             logger.info("  %s: finished %d commits", window.name, len(commits))
 
@@ -188,6 +226,10 @@ class InvestigationEngine:
                 else ""
             ),
         )
+        if sum(1 for c in regression_candidates if "Binary-only" in " ".join(c.evidence)) > 0:
+            logger.info(
+                "Binary-only commits scored from paths/message only (diff skipped for speed)."
+            )
 
         for delta in report.repo_deltas:
             delta.commit_count = count_by_repo.get(delta.name, 0)
@@ -222,6 +264,61 @@ class InvestigationEngine:
         )
         return report
 
+    def _process_commit(
+        self,
+        window: RepoWindow,
+        collector: GitCollector,
+        commit: Commit,
+        failure_key: str,
+        options: AnalysisOptions,
+        bar: ProgressBar | None = None,
+        index: int | None = None,
+    ) -> tuple[Commit, RegressionCandidate] | None:
+        if bar is not None and index is not None:
+            bar.update(index, f"files {commit.short_sha}")
+
+        commit.repo_name = window.name
+        commit.repo_path = window.path
+        if not commit.files:
+            commit.files = collector.changed_paths(commit)
+
+        skip_diff = (
+            options.skip_binary_only_diffs
+            and commit.files
+            and not has_source_paths(commit.files)
+        )
+
+        if bar is not None and index is not None:
+            bar.update(
+                index,
+                f"diff {commit.short_sha} ({len(commit.files)} files)",
+            )
+
+        if skip_diff:
+            diff_text = ""
+        else:
+            heartbeat = None
+            if bar is not None and index is not None:
+                heartbeat = lambda detail, i=index, progress=bar: progress.update(i, detail)
+            diff_text = collector.get_diff(commit, heartbeat=heartbeat)
+
+        diff = self.diff.analyze(diff_text)
+        if not commit.files and diff.modified_files:
+            commit.files = diff.modified_files
+        commit.insertions = diff.added_lines
+        commit.deletions = diff.removed_lines
+        commit = self.parser.parse(commit)
+        commit = self.classifier.classify(commit)
+        candidate = self.candidates.evaluate(commit, failure_key, diff)
+        candidate.evidence.insert(0, f"Repository: {window.name}")
+        candidate.reasons.insert(
+            0,
+            f"Change is in '{window.name}' ({window.good_sha[:8]}..{window.bad_sha[:8]}).",
+        )
+        if skip_diff:
+            candidate.evidence.append("Binary-only paths; diff skipped for speed")
+        return commit, candidate
+
     @staticmethod
     def _related_topics(failure: str) -> list[str]:
         profile = config.get_failure_profile(failure)
@@ -236,6 +333,28 @@ class InvestigationEngine:
             if set(profile.domains) & set(other.domains):
                 related.append(name)
         return sorted(related)[:16]
+
+
+def _analysis_options(workers: int | None, fast: bool) -> AnalysisOptions:
+    analysis = config.settings.get("analysis") or {}
+    skip_binary = bool(analysis.get("skip_binary_only_diffs", True))
+    default_workers = int(analysis.get("workers", 1))
+
+    if fast:
+        skip_binary = True
+        cpu = os.cpu_count() or 4
+        resolved_workers = max(4, min(cpu, 8))
+    elif workers is not None:
+        resolved_workers = max(0, int(workers))
+    else:
+        resolved_workers = default_workers
+
+    if resolved_workers <= 1:
+        resolved_workers = 1
+    return AnalysisOptions(
+        workers=resolved_workers,
+        skip_binary_only_diffs=skip_binary,
+    )
 
 
 def _repo_label(path: str) -> str:

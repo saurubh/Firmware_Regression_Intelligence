@@ -4,6 +4,15 @@ analysis:
   minimum_confidence: 25
   # Independent signals (path, keyword, hazard, boot API) raise a
   # commit even when the raw diff is small.
+  workers: 4
+  skip_binary_only_diffs: true
+
+git:
+  list_timeout_sec: 180
+  diff_timeout_sec: 15
+  path_timeout_sec: 20
+  max_source_paths: 120
+  max_diff_bytes: 1000000
 
 report:
   top_candidates: 10

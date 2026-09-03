@@ -62,6 +62,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Regression failure profile from config/failure_profiles.yaml",
     )
     investigate.add_argument("--top", type=int, default=10, help="Maximum number of candidates")
+    investigate.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Parallel commit analysis threads (default from config; 1 = sequential)",
+    )
+    investigate.add_argument(
+        "--fast",
+        action="store_true",
+        help="Faster run: parallel workers + skip diffs on binary-only commits",
+    )
     investigate.add_argument("--html", action="store_true", help="Generate HTML dashboard")
     investigate.add_argument("--json", action="store_true", help="Generate JSON report")
     investigate.add_argument("--verbose", action="store_true", help="Enable verbose logging")
