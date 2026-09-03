@@ -1,6 +1,5 @@
-# gitman.yml layout used by Birch Stream-style trees.
-# FRI reads sources[].name as folders under `location` and looks up
-# the same --good / --bad tag in each Git clone.
+# gitman.yml is only a *format*. FRI does not hardcode Edk2/Intel/Lenovo.
+# It reads every sources[].name, then walks the tree for other Git repos.
 #
 #   fri pins --gitman ./gitman.yml --good GOOD_TAG --bad BAD_TAG
 #   fri investigate --gitman ./gitman.yml --good GOOD_TAG --bad BAD_TAG --failure os_boot

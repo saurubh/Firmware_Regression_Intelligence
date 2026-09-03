@@ -12,6 +12,7 @@ sub-repo first, then falls back to the superproject gitlink pin.
 from __future__ import annotations
 
 import configparser
+import os
 from pathlib import Path
 
 import yaml
@@ -76,44 +77,44 @@ class WorkspaceCollector:
             gitlink_bad = (
                 self._gitlink_sha(parent, parent_bad, rel_in_parent) if parent is not None else ""
             )
-            g_sha, g_src, b_sha, b_src, status = self._pair(
-                opened,
-                good,
-                bad,
+            self._record_repo(
+                windows,
+                deltas,
+                name=relpath.replace("\\", "/"),
+                repo_dir=root / relpath,
+                rel=relpath,
+                opened=opened,
+                good=good,
+                bad=bad,
                 gitlink_good=gitlink_good or "",
                 gitlink_bad=gitlink_bad or "",
-                name=relpath,
             )
-            deltas.append(
-                RepoDelta(
-                    name=relpath.replace("\\", "/"),
-                    path=relpath,
-                    good_sha=g_sha,
-                    bad_sha=b_sha,
-                    status=status if opened is not None else "missing",
-                    good_source=g_src if opened is not None else "missing",
-                    bad_source=b_src if opened is not None else "missing",
-                )
+
+        known = set()
+        for item in deltas:
+            folder = Path(item.path)
+            if not folder.is_absolute():
+                folder = root / item.path
+            known.add(str(folder.resolve()))
+        extras = [
+            path for path in discover_git_worktrees(root) if str(path) not in known
+        ]
+        if extras:
+            logger.info("Disk walk: %d extra git worktree(s) not listed as submodules.", len(extras))
+        for repo_dir in extras:
+            rel = _rel_label(root, repo_dir)
+            self._record_repo(
+                windows,
+                deltas,
+                name=rel,
+                repo_dir=repo_dir,
+                rel=rel,
+                opened=_open_if_git(repo_dir),
+                good=good,
+                bad=bad,
+                gitlink_good="",
+                gitlink_bad="",
             )
-            git_path = self._openable_path(root, relpath)
-            if status == "changed" and git_path is not None and g_sha and b_sha:
-                windows.append(
-                    RepoWindow(
-                        name=relpath.replace("\\", "/"),
-                        path=str(git_path),
-                        good_sha=g_sha,
-                        bad_sha=b_sha,
-                        changed=True,
-                    )
-                )
-                logger.info(
-                    "Repo %s moved %s (%s) -> %s (%s)",
-                    relpath,
-                    g_sha[:8],
-                    g_src,
-                    b_sha[:8],
-                    b_src,
-                )
 
         return WorkspacePlan(
             workspace=str(root),
@@ -190,7 +191,7 @@ class WorkspaceCollector:
         return self.plan_from_workspace(workspace, good, bad)
 
     def plan_from_gitman(self, gitman_path: str, good: str, bad: str) -> WorkspacePlan:
-        """Inspect every `sources[].name` folder from gitman.yml for the same tags."""
+        """gitman.yml names first, then every git worktree under location."""
         path = Path(gitman_path).expanduser().resolve()
         if not path.is_file():
             raise RuntimeError(f"gitman.yml not found: {path}")
@@ -205,66 +206,67 @@ class WorkspaceCollector:
                 name = str(item.get("name") or "").strip()
                 if name and name not in names:
                     names.append(name)
-        if not names:
-            raise RuntimeError(f"{path} has no sources[].name entries.")
-        logger.info("gitman.yml: %d source folder(s) under %s", len(names), root)
-
-        entries: list[tuple[str, Path, str]] = []
-        seen: set[str] = set()
-        if _is_git_dir(root):
-            entries.append((root.name or "platform", root, "."))
-            seen.add(str(root))
-        for name in names:
-            repo_dir = (root / name).resolve()
-            key = str(repo_dir)
-            if key in seen:
-                continue
-            seen.add(key)
-            entries.append((name, repo_dir, name))
+        logger.info("gitman.yml: %d named source(s) under %s", len(names), root)
 
         windows: list[RepoWindow] = []
         deltas: list[RepoDelta] = []
-        for name, repo_dir, rel in entries:
-            opened = _open_if_git(repo_dir)
-            g_sha, g_src, b_sha, b_src, status = self._pair(
-                opened,
-                good,
-                bad,
+        seen: set[str] = set()
+
+        if _looks_like_worktree(root):
+            self._record_repo(
+                windows,
+                deltas,
+                name=root.name or "platform",
+                repo_dir=root,
+                rel=".",
+                opened=_open_if_git(root),
+                good=good,
+                bad=bad,
                 gitlink_good="",
                 gitlink_bad="",
+            )
+            seen.add(str(root))
+
+        for name in names:
+            repo_dir = (root / name).resolve()
+            if str(repo_dir) in seen:
+                continue
+            seen.add(str(repo_dir))
+            self._record_repo(
+                windows,
+                deltas,
                 name=name,
+                repo_dir=repo_dir,
+                rel=name,
+                opened=_open_if_git(repo_dir),
+                good=good,
+                bad=bad,
+                gitlink_good="",
+                gitlink_bad="",
             )
-            if opened is None:
-                status = "missing"
-                g_src = b_src = "missing"
-            logger.info(
-                "  %-22s  %s  via %s/%s",
-                name,
-                status,
-                g_src,
-                b_src,
+
+        extras = [item for item in discover_git_worktrees(root) if str(item) not in seen]
+        if extras:
+            logger.info("Disk walk: %d additional git worktree(s).", len(extras))
+        for repo_dir in extras:
+            rel = _rel_label(root, repo_dir)
+            seen.add(str(repo_dir))
+            self._record_repo(
+                windows,
+                deltas,
+                name=rel,
+                repo_dir=repo_dir,
+                rel=rel,
+                opened=_open_if_git(repo_dir),
+                good=good,
+                bad=bad,
+                gitlink_good="",
+                gitlink_bad="",
             )
-            deltas.append(
-                RepoDelta(
-                    name=name,
-                    path=rel,
-                    good_sha=g_sha,
-                    bad_sha=b_sha,
-                    status=status,
-                    good_source=g_src,
-                    bad_source=b_src,
-                )
+        if not deltas:
+            raise RuntimeError(
+                f"No Git repositories found via {path} or by walking {root}."
             )
-            if status == "changed" and opened is not None and g_sha and b_sha:
-                windows.append(
-                    RepoWindow(
-                        name=name,
-                        path=str(repo_dir),
-                        good_sha=g_sha,
-                        bad_sha=b_sha,
-                        changed=True,
-                    )
-                )
         return WorkspacePlan(
             workspace=str(root),
             good_label=good,
@@ -272,6 +274,53 @@ class WorkspaceCollector:
             windows=windows,
             deltas=deltas,
         )
+
+    def _record_repo(
+        self,
+        windows: list[RepoWindow],
+        deltas: list[RepoDelta],
+        name: str,
+        repo_dir: Path,
+        rel: str,
+        opened: Repo | None,
+        good: str,
+        bad: str,
+        gitlink_good: str,
+        gitlink_bad: str,
+    ) -> None:
+        g_sha, g_src, b_sha, b_src, status = self._pair(
+            opened,
+            good,
+            bad,
+            gitlink_good=gitlink_good,
+            gitlink_bad=gitlink_bad,
+            name=name,
+        )
+        if opened is None:
+            status = "missing"
+            g_src = b_src = "missing"
+        logger.info("  %-28s %s  via %s/%s", name, status, g_src, b_src)
+        deltas.append(
+            RepoDelta(
+                name=name,
+                path=rel,
+                good_sha=g_sha,
+                bad_sha=b_sha,
+                status=status,
+                good_source=g_src,
+                bad_source=b_src,
+            )
+        )
+        if status == "changed" and opened is not None and g_sha and b_sha:
+            windows.append(
+                RepoWindow(
+                    name=name,
+                    path=str(repo_dir),
+                    good_sha=g_sha,
+                    bad_sha=b_sha,
+                    changed=True,
+                )
+            )
 
     def _pair(
         self,
@@ -437,12 +486,77 @@ class WorkspaceCollector:
         return None
 
 
-def _is_git_dir(path: Path) -> bool:
+WALK_SKIP = {
+    ".git",
+    ".svn",
+    ".hg",
+    "Build",
+    "build",
+    "Conf",
+    "Output",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "node_modules",
+    ".cache",
+    "logs",
+    ".pytest_cache",
+}
+WALK_MAX_DEPTH = 8
+
+
+def _looks_like_worktree(path: Path) -> bool:
+    return (path / ".git").exists()
+
+
+def _rel_label(root: Path, repo_dir: Path) -> str:
     try:
-        Repo(str(path))
-        return True
-    except (InvalidGitRepositoryError, Exception):
-        return False
+        rel = repo_dir.resolve().relative_to(root.resolve())
+    except ValueError:
+        return repo_dir.name
+    text = str(rel).replace("\\", "/")
+    return "." if text == "." else text
+
+
+def discover_git_worktrees(root: Path) -> list[Path]:
+    """Find Git checkouts under root. No vendor names are hardcoded."""
+    root = root.resolve()
+    found: list[Path] = []
+    if _looks_like_worktree(root):
+        found.append(root)
+    for dirpath, dirnames, _filenames in os.walk(root, topdown=True, followlinks=False):
+        current = Path(dirpath)
+        try:
+            relative = current.relative_to(root)
+        except ValueError:
+            dirnames[:] = []
+            continue
+        depth = 0 if relative == Path(".") else len(relative.parts)
+        keep = []
+        for name in dirnames:
+            if name in WALK_SKIP:
+                continue
+            if depth + 1 > WALK_MAX_DEPTH:
+                continue
+            keep.append(name)
+        dirnames[:] = keep
+        if current == root:
+            continue
+        if _looks_like_worktree(current):
+            found.append(current.resolve())
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for item in found:
+        key = str(item.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item.resolve())
+    return unique
+
+
+def _is_git_dir(path: Path) -> bool:
+    return _looks_like_worktree(path) and _open_if_git(path) is not None
 
 
 def _open_if_git(path: Path) -> Repo | None:

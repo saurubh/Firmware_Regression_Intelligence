@@ -76,6 +76,24 @@ sources:
     assert by_name["Intel"].status == "unchanged"
     assert by_name["Lenovo/Base"].status == "missing"
 
+    agesa = _init_repo(tmp_path / "AgesaPkg")
+    (tmp_path / "AgesaPkg" / "AmdInit.c").write_text("void AmdInit(void) {}\n", encoding="utf-8")
+    agesa.index.add(["AmdInit.c"])
+    agesa.index.commit("agesa good")
+    agesa.create_tag("GOOD_BUILD")
+    (tmp_path / "AgesaPkg" / "AmdInit.c").write_text("void AmdInitPost(void) {}\n", encoding="utf-8")
+    agesa.index.add(["AmdInit.c"])
+    agesa.index.commit("agesa bad")
+    agesa.create_tag("BAD_BUILD")
+
+    plan = WorkspaceCollector().plan_from_gitman(str(gitman), "GOOD_BUILD", "BAD_BUILD")
+    names = [delta.name for delta in plan.deltas]
+    assert "Edk2" in names
+    assert "AgesaPkg" in names
+    by_name = {delta.name: delta for delta in plan.deltas}
+    assert by_name["AgesaPkg"].status == "changed"
+    assert by_name["AgesaPkg"].good_source == "tag"
+
     report = InvestigationEngine().investigate_gitman(
         str(gitman), "GOOD_BUILD", "BAD_BUILD", "os_boot"
     )

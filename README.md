@@ -701,26 +701,32 @@ Tags must exist **locally** in each clone (`git fetch --tags` and `git submodule
 
 If you pass SHAs instead of tag names, behavior is unchanged: each sub-repo uses the gitlink at the superproject’s good/bad commits.
 
-## 3. gitman.yml (Edk2 / Intel / Lenovo folders)
+## 3. gitman.yml + disk walk (any Intel or AMD BIOS tree)
 
-If the tree is assembled with **gitman** (not git submodules), pass the yaml file. FRI reads every `sources[].name` (and `sources_locked`) as a folder under `location`, then looks up the **same** `--good` / `--bad` tag in each clone. The folder that contains `gitman.yml` is also scanned if it is a Git repo (the platform tree).
+`--gitman` is **not** a hardcoded list of Edk2/Intel/Lenovo names. FRI:
+
+1. Reads **whatever** `sources[].name` (and `sources_locked`) gitman.yml lists and looks up `--good` / `--bad` in those folders.
+2. **Walks the disk** under gitman `location` for any other Git worktree (`.git`) and looks up the **same** tags there too — so an AMD `AgesaPkg`, extra silicon tree, or vendor folder is picked up even if it is missing from gitman.yml.
+
+Build/output directories are skipped. Repo names are the relative folder paths, not a built-in vendor table.
+
+`--workspace` also walks for extra Git checkouts after reading `.gitmodules`.
 
 ```bash
 fri pins \
     --gitman ~/BHS_2026/birchstream-ih/gitman.yml \
-    --good 'IHE117Y_1.41_01@BirchStreamReferenceBuild@20260224@3545.P.03@2025.47@FW25-5' \
-    --bad 'IHE119A_1.50_01@BirchStreamReferenceBuild@20260205@3545.P.22@2026.10@UPLR3'
+    --good 'IHE117Y_...FW25-5' \
+    --bad 'IHE119A_...UPLR3'
 
 fri investigate \
     --gitman ~/BHS_2026/birchstream-ih/gitman.yml \
-    --good 'IHE117Y_1.41_01@BirchStreamReferenceBuild@20260224@3545.P.03@2025.47@FW25-5' \
-    --bad 'IHE119A_1.50_01@BirchStreamReferenceBuild@20260205@3545.P.22@2026.10@UPLR3' \
+    --good 'IHE117Y_...FW25-5' \
+    --bad 'IHE119A_...UPLR3' \
     --failure os_boot \
-    --top 20 \
-    --html --json
+    --top 20 --html --json
 ```
 
-Folders such as `Edk2`, `Intel`, and `Lenovo/Base` are taken from `- name:`. Missing clones show as `missing` in `fri pins`. FRI does not clone from the `repo:` URLs.
+Missing clones listed only in gitman.yml show as `missing`. FRI does not clone `repo:` URLs.
 
 ## 4. Explicit pin manifest
 
