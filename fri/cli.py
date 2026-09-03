@@ -27,11 +27,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     investigate = subparsers.add_parser(
         "investigate",
-        help="Investigate a firmware or OS-boot regression",
+        help="Investigate a firmware regression (one repo or a BIOS workspace)",
     )
-    investigate.add_argument("--repo", required=True, help="Path to Git repository")
-    investigate.add_argument("--good", required=True, help="Known-good build, tag or commit")
-    investigate.add_argument("--bad", required=True, help="Known-bad build, tag or commit")
+    source = investigate.add_mutually_exclusive_group(required=True)
+    source.add_argument("--repo", help="Single Git repository")
+    source.add_argument(
+        "--workspace",
+        help="BIOS superproject with edk2 / Intel / platform submodules",
+    )
+    source.add_argument(
+        "--manifest",
+        help="YAML pin-set listing each repo's good and bad SHA",
+    )
+    investigate.add_argument(
+        "--good",
+        help="Known-good superproject build, tag or commit (with --repo or --workspace)",
+    )
+    investigate.add_argument(
+        "--bad",
+        help="Known-bad superproject build, tag or commit (with --repo or --workspace)",
+    )
     investigate.add_argument(
         "--failure",
         required=True,
@@ -42,6 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
     investigate.add_argument("--html", action="store_true", help="Generate HTML dashboard")
     investigate.add_argument("--json", action="store_true", help="Generate JSON report")
     investigate.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+
+    pins = subparsers.add_parser(
+        "pins",
+        help="Show which submodules/repos moved between two BIOS builds",
+    )
+    pins.add_argument("--workspace", required=True, help="BIOS superproject path")
+    pins.add_argument("--good", required=True, help="Known-good tag or commit")
+    pins.add_argument("--bad", required=True, help="Known-bad tag or commit")
 
     subparsers.add_parser("doctor", help="Validate FRI installation and list profiles")
     subparsers.add_parser("config", help="Display loaded configuration")

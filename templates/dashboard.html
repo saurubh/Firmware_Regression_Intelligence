@@ -391,6 +391,26 @@ Failure
 
 </div>
 
+{% if report.workspace %}
+
+<div class="info-card">
+
+<div class="info-title">
+
+Workspace
+
+</div>
+
+<div class="info-value">
+
+{{ report.workspace }}
+
+</div>
+
+</div>
+
+{% endif %}
+
 <div class="info-card">
 
 <div class="info-title">
@@ -507,7 +527,73 @@ High Confidence
 
 </div>
 
+<div class="stat">
+
+<div class="stat-title">
+
+Moved Repos
+
 </div>
+
+<div class="stat-value">
+
+{{ statistics.repo_count }}
+
+</div>
+
+</div>
+
+</div>
+
+{% if report.repo_deltas %}
+
+<div class="section">
+
+<h2>Pin-set (which Git repos moved)</h2>
+
+<div class="module-card">
+
+<table style="width:100%;border-collapse:collapse;">
+
+<thead>
+
+<tr style="text-align:left;color:var(--muted);">
+
+<th style="padding:8px;">Repo</th>
+<th style="padding:8px;">Status</th>
+<th style="padding:8px;">Commits</th>
+<th style="padding:8px;">Good pin</th>
+<th style="padding:8px;">Bad pin</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for delta in report.repo_deltas %}
+
+<tr>
+
+<td style="padding:8px;font-weight:bold;">{{ delta.name }}</td>
+<td style="padding:8px;">{{ delta.status }}</td>
+<td style="padding:8px;">{{ delta.commit_count }}</td>
+<td style="padding:8px;font-family:monospace;">{{ (delta.good_sha or "-")[:12] }}</td>
+<td style="padding:8px;font-family:monospace;">{{ (delta.bad_sha or "-")[:12] }}</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+{% endif %}
 
 {% if report.related_topics %}
 
@@ -734,7 +820,7 @@ No affected firmware modules found.
 
 <div style="margin-top:6px;color:var(--muted);">
 
-{{ candidate.commit.message }}
+{% if candidate.commit.repo_name %}{{ candidate.commit.repo_name }} · {% endif %}{{ candidate.commit.subject }}
 
 </div>
 
@@ -790,6 +876,26 @@ color:var(--danger);
 </div>
 
 <div class="details">
+
+{% if candidate.commit.repo_name %}
+
+<div class="detail">
+
+<div class="detail-title">
+
+Repository
+
+</div>
+
+<div class="detail-value">
+
+{{ candidate.commit.repo_name }}
+
+</div>
+
+</div>
+
+{% endif %}
 
 <div class="detail">
 

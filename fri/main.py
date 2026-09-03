@@ -34,24 +34,46 @@ def main() -> int:
     if args.command == "phases":
         return _phases()
 
+    if args.command == "pins":
+        return _pins(args.workspace, args.good, args.bad)
+
     if args.command != "investigate":
         print("Unknown command.")
         return 1
 
+    if args.repo and (not args.good or not args.bad):
+        print("--good and --bad are required with --repo.")
+        return 2
+    if args.workspace and (not args.good or not args.bad):
+        print("--good and --bad are required with --workspace.")
+        return 2
+
     logger.info("=" * 80)
     logger.info("Firmware Regression Intelligence")
     logger.info("=" * 80)
-    logger.info("Repository   : %s", args.repo)
-    logger.info("Good Build   : %s", args.good)
-    logger.info("Bad Build    : %s", args.bad)
     logger.info("Failure Type : %s", args.failure)
 
     try:
-        report = InvestigationEngine(args.repo).investigate(
-            good=args.good,
-            bad=args.bad,
-            failure=args.failure,
-        )
+        engine = InvestigationEngine(args.repo)
+        if args.manifest:
+            logger.info("Manifest     : %s", args.manifest)
+            report = engine.investigate_manifest(args.manifest, args.failure)
+        elif args.workspace:
+            logger.info("Workspace    : %s", args.workspace)
+            logger.info("Good Build   : %s", args.good)
+            logger.info("Bad Build    : %s", args.bad)
+            report = engine.investigate_workspace(
+                args.workspace, args.good, args.bad, args.failure
+            )
+        else:
+            logger.info("Repository   : %s", args.repo)
+            logger.info("Good Build   : %s", args.good)
+            logger.info("Bad Build    : %s", args.bad)
+            report = engine.investigate(
+                good=args.good,
+                bad=args.bad,
+                failure=args.failure,
+            )
         ConsoleReport().render(report, top=args.top)
         if args.html:
             output = HtmlReport().render(report, top=args.top)
@@ -112,6 +134,31 @@ def _phases() -> int:
             print(f"       {phase.description.split('.')[0].strip()}.")
         print(f"       vendors: {vendors}")
         print()
+    return 0
+
+
+def _pins(workspace: str, good: str, bad: str) -> int:
+    from fri.collector.workspace import WorkspaceCollector
+
+    plan = WorkspaceCollector().plan_from_workspace(workspace, good, bad)
+    print(f"Workspace : {plan.workspace}")
+    print(f"Good      : {plan.good_label}")
+    print(f"Bad       : {plan.bad_label}")
+    print()
+    print(f"{'repo':<28} {'status':<12} {'good':<12} {'bad':<12}")
+    print("-" * 70)
+    for delta in plan.deltas:
+        print(
+            f"{delta.name:<28} {delta.status:<12} "
+            f"{(delta.good_sha or '-'):<12.12} {(delta.bad_sha or '-'):<12.12}"
+        )
+    moved = [item for item in plan.deltas if item.status == "changed"]
+    print()
+    print(f"{len(moved)} repo(s) moved. Investigate with:")
+    print(
+        f"  fri investigate --workspace {workspace} "
+        f"--good {good} --bad {bad} --failure from_reset"
+    )
     return 0
 
 

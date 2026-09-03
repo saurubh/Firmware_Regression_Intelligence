@@ -618,7 +618,7 @@ fri topics
 
 # Quick Start
 
-Firmware / BIOS boot regression:
+Firmware / BIOS boot regression (single Git repo):
 
 ```bash
 fri investigate \
@@ -644,20 +644,72 @@ fri investigate \
 
 ---
 
-# Command Line Arguments
+# Multi-repo BIOS workspaces (edk2 + Intel + platforms)
 
-## Repository
+A UEFI BIOS **build is a pin-set**, not one SHA. The binary that left the factory is the joint of:
+
+- the platform / board repo
+- `edk2`
+- `edk2-platforms`
+- Intel silicon (FSP, ME/CSME blobs, Boot Guard, IIO/PCH) **or** AMD AGESA / PSP
+- any other Git submodule your tree vendors
+
+A “good build” and a “bad build” are therefore **two complete pin tables**. Ranking only the platform repo will miss an FSP-M change in the Intel tree, and ranking only edk2 will miss a board ACPI DSDT.
+
+## 1. See what moved
+
+Point FRI at the **superproject** (the tree that has `.gitmodules`) and the two BIOS tags you already flash:
 
 ```bash
---repo
+fri pins \
+    --workspace ~/BHS_2026/birchstream-rv \
+    --good GOOD_BUILD_TAG \
+    --bad BAD_BUILD_TAG
 ```
 
-Path to the firmware Git repository.
+FRI reads each revision’s gitlinks (and nested submodules) and prints `changed` / `unchanged` / `missing` for every pin. Unchanged Intel/EDK trees are skipped. Missing means that checkout is not cloned (or the object is not in `.git/modules/...`), so FRI cannot walk that repo until you sync it.
 
-Example:
+## 2. Investigate the joint window
 
 ```bash
---repo ~/BHS_2026/birchstream-rv
+fri investigate \
+    --workspace ~/BHS_2026/birchstream-rv \
+    --good GOOD_BUILD_TAG \
+    --bad BAD_BUILD_TAG \
+    --failure from_reset \
+    --html --json
+```
+
+FRI walks **every moved repo**, tags each candidate with the repository name, ranks them on one list, and groups modules as `edk2 / ACPI` vs `Intel / FSP`. Bisect hints are **per moved repo** (`git -C edk2 bisect start <bad-pin> <good-pin>`). Do not bisect the superproject SHA as if the whole BIOS were one Git history.
+
+## 3. Explicit pin manifest
+
+When repos are siblings (not submodules), or you already know the SHAs from a build database:
+
+```bash
+fri investigate --manifest bios-pins.yaml --failure os_boot
+```
+
+See `config/workspace.example.yaml`. Each entry is `{name, path, good?, bad?}`. Top-level `good`/`bad` apply unless a repo overrides them.
+
+Single-repo `--repo` still works for a tree that really is one Git history.
+
+---
+
+# Command Line Arguments
+
+## Repository sources (pick one)
+
+```bash
+--repo         Single Git repository
+--workspace    BIOS superproject; FRI expands .gitmodules pins
+--manifest     YAML pin-set (see config/workspace.example.yaml)
+```
+
+`--good` and `--bad` are required with `--repo` and `--workspace`. They are the superproject tags/SHAs (the BIOS builds you flash). FRI then resolves each submodule pin at those two revisions.
+
+```bash
+fri pins --workspace ~/firmware --good GOOD --bad BAD
 ```
 
 ---

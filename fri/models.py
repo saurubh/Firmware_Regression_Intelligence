@@ -35,6 +35,8 @@ class Commit:
     domains: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     is_merge_commit: bool = False
+    repo_name: str = ""
+    repo_path: str = ""
     git_object: Any = field(default=None, repr=False, compare=False)
 
     @property
@@ -173,6 +175,41 @@ class RegressionStatistics:
     execution_time: float = 0.0
     hazard_commits: int = 0
     high_confidence: int = 0
+    repo_count: int = 0
+
+
+@dataclass
+class RepoWindow:
+    """One Git repository between a good pin and a bad pin."""
+
+    name: str
+    path: str
+    good_sha: str
+    bad_sha: str
+    changed: bool = True
+
+
+@dataclass
+class RepoDelta:
+    """What moved in one repo/submodule between two BIOS builds."""
+
+    name: str
+    path: str
+    good_sha: str
+    bad_sha: str
+    commit_count: int = 0
+    status: str = "changed"  # changed | unchanged | missing
+
+
+@dataclass
+class WorkspacePlan:
+    """Joint good/bad pin-set across a BIOS workspace."""
+
+    workspace: str
+    good_label: str
+    bad_label: str
+    windows: list[RepoWindow] = field(default_factory=list)
+    deltas: list[RepoDelta] = field(default_factory=list)
 
 
 @dataclass
@@ -229,5 +266,7 @@ class RegressionReport:
     modules: list[ModuleCandidate] = field(default_factory=list)
     bisect: BisectPlan | None = None
     triage: TriagePlan | None = None
+    workspace: str = ""
+    repo_deltas: list[RepoDelta] = field(default_factory=list)
     statistics: RegressionStatistics = field(default_factory=RegressionStatistics)
     generated_at: datetime = field(default_factory=datetime.now)

@@ -37,5 +37,22 @@ def test_version_flag():
         raise AssertionError("expected version to exit")
 
 
-def test_package_version():
-    assert VERSION.startswith("2.")
+def test_workspace_and_pins_cli_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "investigate",
+            "--workspace",
+            "/tmp/bios",
+            "--good",
+            "GOOD",
+            "--bad",
+            "BAD",
+            "--failure",
+            "from_reset",
+        ]
+    )
+    assert args.workspace == "/tmp/bios"
+    assert args.repo is None
+    pins = parser.parse_args(["pins", "--workspace", "/tmp/bios", "--good", "G", "--bad", "B"])
+    assert pins.command == "pins"

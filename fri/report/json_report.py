@@ -28,6 +28,18 @@ class JsonReport:
             "covered_topics": report.covered_topics,
             "triage": None,
             "generated_at": report.generated_at.isoformat(),
+            "workspace": report.workspace,
+            "repo_deltas": [
+                {
+                    "name": delta.name,
+                    "path": delta.path,
+                    "good_sha": delta.good_sha,
+                    "bad_sha": delta.bad_sha,
+                    "commit_count": delta.commit_count,
+                    "status": delta.status,
+                }
+                for delta in report.repo_deltas
+            ],
             "statistics": {
                 "total_commits": report.statistics.total_commits,
                 "filtered_commits": report.statistics.filtered_commits,
@@ -36,6 +48,7 @@ class JsonReport:
                 "execution_time": report.statistics.execution_time,
                 "hazard_commits": report.statistics.hazard_commits,
                 "high_confidence": report.statistics.high_confidence,
+                "repo_count": report.statistics.repo_count,
             },
             "commits": [],
             "candidates": [],
@@ -62,6 +75,8 @@ class JsonReport:
                     "deletions": commit.deletions,
                     "total_changes": commit.total_changes,
                     "merge_commit": commit.is_merge_commit,
+                    "repo_name": commit.repo_name,
+                    "repo_path": commit.repo_path,
                 }
             )
 
@@ -71,6 +86,7 @@ class JsonReport:
                     "rank": candidate.rank,
                     "commit": candidate.commit.short_sha,
                     "sha": candidate.commit.sha,
+                    "repo": candidate.commit.repo_name,
                     "subject": candidate.commit.subject,
                     "confidence": candidate.confidence,
                     "score": candidate.score,

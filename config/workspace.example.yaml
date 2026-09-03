@@ -1,0 +1,29 @@
+# Example pin-set for a UEFI BIOS workspace.
+#
+# A "good build" and "bad build" are not one SHA. They are the joint pins of
+# the platform tree, edk2, edk2-platforms, and vendor silicon.
+#
+# Usage:
+#   fri investigate --manifest config/workspace.example.yaml --failure from_reset
+#
+# You can omit `repos` and let FRI read .gitmodules from --workspace good/bad:
+#   workspace: /home/you/BHS_2026/birchstream-rv
+#   good: GOOD_TAG
+#   bad: BAD_TAG
+
+workspace: /path/to/platform-superproject
+good: GOOD_BUILD_TAG
+bad: BAD_BUILD_TAG
+
+repos:
+  - name: platform
+    path: .
+  - name: edk2
+    path: edk2
+  - name: edk2-platforms
+    path: edk2-platforms
+  - name: Intel
+    path: Intel
+    # Optional per-repo overrides when a repo is not a submodule pin:
+    # good: abcdef1
+    # bad:  89abcde

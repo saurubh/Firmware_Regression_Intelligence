@@ -21,8 +21,10 @@ class ModuleAnalyzer:
         groups: dict[str, list[RegressionCandidate]] = defaultdict(list)
         for candidate in candidates:
             domains = candidate.matched_domains or ["Unknown"]
+            repo = candidate.commit.repo_name
             for domain in domains:
-                groups[domain].append(candidate)
+                label = f"{repo} / {domain}" if repo else domain
+                groups[label].append(candidate)
 
         built = [self._build_module(name, group) for name, group in groups.items()]
         peak = max((module.strength for module in built), default=0.0)

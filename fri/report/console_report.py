@@ -21,6 +21,8 @@ class ConsoleReport:
         print(f"Good Build : {report.good_sha}")
         print(f"Bad Build  : {report.bad_sha}")
         print(f"Failure    : {report.failure}")
+        if report.workspace:
+            print(f"Workspace  : {report.workspace}")
         if report.profile_description:
             print()
             print(report.profile_description)
@@ -31,8 +33,22 @@ class ConsoleReport:
             f"Candidates {stats.candidate_commits}  |  "
             f"Hazards {stats.hazard_commits}  |  "
             f"High-confidence {stats.high_confidence}  |  "
+            f"Repos {stats.repo_count}  |  "
             f"{stats.execution_time}s"
         )
+        if report.repo_deltas:
+            print()
+            print("=" * 90)
+            print("PIN-SET  (repos that moved between the two BIOS builds)")
+            print("=" * 90)
+            print()
+            print(f"{'repo':<28} {'status':<12} {'commits':<8} {'good':<12} {'bad':<12}")
+            print("-" * 80)
+            for delta in report.repo_deltas:
+                print(
+                    f"{delta.name:<28} {delta.status:<12} {delta.commit_count:<8} "
+                    f"{(delta.good_sha or '-'):<12.12} {(delta.bad_sha or '-'):<12.12}"
+                )
         if report.related_topics:
             print()
             print("Related topics: " + ", ".join(report.related_topics))
@@ -67,6 +83,8 @@ class ConsoleReport:
             commit = candidate.commit
             print(f"[{idx}] {commit.short_sha}   score={candidate.score}  signals={candidate.signal_count}")
             print(f"     Confidence : {candidate.confidence}%")
+            if commit.repo_name:
+                print(f"     Repo       : {commit.repo_name}")
             print(f"     Author     : {commit.author}")
             print(f"     Jira       : {commit.jira}")
             print(f"     Intent     : {commit.intent}")
