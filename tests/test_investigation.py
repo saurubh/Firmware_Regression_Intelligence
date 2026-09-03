@@ -2,7 +2,7 @@ from pathlib import Path
 
 from git import Repo
 
-from fri.collector.git_collector import _is_source
+from fri.collector.git_collector import _decode_git_bytes, _is_source
 from fri.engine.investigation_engine import InvestigationEngine
 from fri.main import _doctor, _topics
 
@@ -46,6 +46,11 @@ def test_end_to_end_os_boot_investigation(tmp_path: Path):
     assert report.bisect is not None
     assert report.covered_topics
     assert "acpi" in report.related_topics
+
+
+def test_git_output_decodes_binary_without_crash():
+    assert _decode_git_bytes(b"hello \xf6 world") == "hello \ufffd world"
+    assert _decode_git_bytes(None) == ""
 
 
 def test_source_filter_skips_firmware_binaries():

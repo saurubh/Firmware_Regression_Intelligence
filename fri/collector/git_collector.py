@@ -57,6 +57,12 @@ MAX_SOURCE_PATHS = 120
 MAX_DIFF_BYTES = 1_000_000
 
 
+def _decode_git_bytes(data: bytes | None) -> str:
+    if not data:
+        return ""
+    return data.decode("utf-8", errors="replace")
+
+
 def _is_source(path: str) -> bool:
     suffix = Path(path).suffix.lower()
     return suffix in SOURCE_SUFFIXES
@@ -263,7 +269,6 @@ class GitCollector:
             ["git", "-C", str(self.repo_path), *args],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            text=True,
         )
         try:
             output, _ = proc.communicate(timeout=timeout)
@@ -271,7 +276,9 @@ class GitCollector:
             proc.kill()
             proc.communicate()
             raise
-        return output or ""
+        if not output:
+            return ""
+        return _decode_git_bytes(output)
 
     # ======================================================
 

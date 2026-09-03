@@ -15,7 +15,7 @@ PROJECT_NAME = "Firmware Regression Intelligence"
 
 SHORT_NAME = "FRI"
 
-VERSION = "2.4.2"
+VERSION = "2.4.3"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
