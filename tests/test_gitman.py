@@ -123,3 +123,40 @@ def test_cli_accepts_gitman_flag():
         ["pins", "--gitman", "gitman.yml", "--good", "G", "--bad", "B"]
     )
     assert pins.gitman == "gitman.yml"
+
+
+def test_gitman_uses_shared_at_suffix_in_nested_repos(tmp_path: Path):
+    full_good = "IHE117Y_1.41_01@BirchStreamReferenceBuild@good"
+    full_bad = "IHE119A_1.50_01@BirchStreamReferenceBuild@bad"
+    shared_good = "@BirchStreamReferenceBuild@good"
+    shared_bad = "@BirchStreamReferenceBuild@bad"
+
+    platform = _init_repo(tmp_path)
+    (tmp_path / "Platform.c").write_text("void P(void) {}\n", encoding="utf-8")
+    platform.index.add(["Platform.c"])
+    platform.index.commit("platform good")
+    platform.create_tag(full_good)
+    (tmp_path / "Platform.c").write_text("void P(void) { x(); }\n", encoding="utf-8")
+    platform.index.add(["Platform.c"])
+    platform.index.commit("platform bad")
+    platform.create_tag(full_bad)
+
+    edk = _init_repo(tmp_path / "Edk2")
+    (tmp_path / "Edk2" / "Bds.c").write_text("void Bds(void) {}\n", encoding="utf-8")
+    edk.index.add(["Bds.c"])
+    edk.index.commit("edk good")
+    edk.create_tag(shared_good)
+    (tmp_path / "Edk2" / "Bds.c").write_text("void Bds(void) { ExitBootServices(); }\n", encoding="utf-8")
+    edk.index.add(["Bds.c"])
+    edk.index.commit("edk bad")
+    edk.create_tag(shared_bad)
+
+    gitman = tmp_path / "gitman.yml"
+    gitman.write_text("location: .\nsources:\n  - name: Edk2\n", encoding="utf-8")
+    plan = WorkspaceCollector().plan_from_gitman(str(gitman), full_good, full_bad)
+    by_name = {delta.name: delta for delta in plan.deltas}
+    assert by_name["Edk2"].status == "changed"
+    assert by_name["Edk2"].good_source == "tag"
+    platform_delta = next(item for item in plan.deltas if item.path == ".")
+    assert platform_delta.status == "changed"
+    assert platform_delta.good_source == "tag"

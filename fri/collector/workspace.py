@@ -20,6 +20,7 @@ from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 
 from fri.collector.build_resolver import BuildResolver
+from fri.collector.pin_tags import labels_for_repo
 from fri.logger import logger
 from fri.models import RepoDelta, RepoWindow, WorkspacePlan
 
@@ -69,8 +70,12 @@ class WorkspaceCollector:
             parent_good = good_sha
             parent_bad = bad_sha
             if parent is not None and parent is not repo:
-                parent_good, _ = BuildResolver.resolve_label(parent, good)
-                parent_bad, _ = BuildResolver.resolve_label(parent, bad)
+                parent_dir = Path(parent.working_tree_dir or str(root / Path(relpath).parent))
+                parent_good_label, parent_bad_label, _ = labels_for_repo(
+                    root, parent_dir, good, bad
+                )
+                parent_good, _ = BuildResolver.resolve_label(parent, parent_good_label)
+                parent_bad, _ = BuildResolver.resolve_label(parent, parent_bad_label)
             gitlink_good = (
                 self._gitlink_sha(parent, parent_good, rel_in_parent) if parent is not None else ""
             )
@@ -84,6 +89,7 @@ class WorkspaceCollector:
                 repo_dir=root / relpath,
                 rel=relpath,
                 opened=opened,
+                root=root,
                 good=good,
                 bad=bad,
                 gitlink_good=gitlink_good or "",
@@ -110,6 +116,7 @@ class WorkspaceCollector:
                 repo_dir=repo_dir,
                 rel=rel,
                 opened=_open_if_git(repo_dir),
+                root=root,
                 good=good,
                 bad=bad,
                 gitlink_good="",
@@ -220,6 +227,7 @@ class WorkspaceCollector:
                 repo_dir=root,
                 rel=".",
                 opened=_open_if_git(root),
+                root=root,
                 good=good,
                 bad=bad,
                 gitlink_good="",
@@ -239,6 +247,7 @@ class WorkspaceCollector:
                 repo_dir=repo_dir,
                 rel=name,
                 opened=_open_if_git(repo_dir),
+                root=root,
                 good=good,
                 bad=bad,
                 gitlink_good="",
@@ -258,6 +267,7 @@ class WorkspaceCollector:
                 repo_dir=repo_dir,
                 rel=rel,
                 opened=_open_if_git(repo_dir),
+                root=root,
                 good=good,
                 bad=bad,
                 gitlink_good="",
@@ -283,23 +293,50 @@ class WorkspaceCollector:
         repo_dir: Path,
         rel: str,
         opened: Repo | None,
+        root: Path,
         good: str,
         bad: str,
         gitlink_good: str,
         gitlink_bad: str,
     ) -> None:
+        good_use, bad_use, is_root = labels_for_repo(root, repo_dir, good, bad)
         g_sha, g_src, b_sha, b_src, status = self._pair(
             opened,
-            good,
-            bad,
+            good_use,
+            bad_use,
             gitlink_good=gitlink_good,
             gitlink_bad=gitlink_bad,
             name=name,
         )
+        if (
+            not is_root
+            and opened is not None
+            and status == "missing"
+            and (good_use != good or bad_use != bad)
+        ):
+            g_sha, g_src, b_sha, b_src, status = self._pair(
+                opened,
+                good,
+                bad,
+                gitlink_good=gitlink_good,
+                gitlink_bad=gitlink_bad,
+                name=name,
+            )
+            good_use, bad_use = good, bad
         if opened is None:
             status = "missing"
             g_src = b_src = "missing"
-        logger.info("  %-28s %s  via %s/%s", name, status, g_src, b_src)
+        kind = "platform tag" if is_root else "shared pin"
+        logger.info(
+            "  %-28s %s  %s %s .. %s  via %s/%s",
+            name,
+            status,
+            kind,
+            good_use,
+            bad_use,
+            g_src,
+            b_src,
+        )
         deltas.append(
             RepoDelta(
                 name=name,

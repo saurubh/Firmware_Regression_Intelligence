@@ -697,9 +697,19 @@ edk2-platforms    gitlink pin   ->  gitlink pin   (no tag in that clone)
 
 The pin table `via` column shows `tag/tag`, `tag/gitlink`, `gitlink/gitlink`, or `sha/sha`. Tags win when they disagree with the gitlink — that is how an Intel tree tagged independently of the platform pin is still compared.
 
-Tags must exist **locally** in each clone (`git fetch --tags` and `git submodule foreach git fetch --tags`). FRI does not hit the network to discover remote tags.
+Tags must exist **locally** in each clone (`git fetch --tags`). FRI does not hit the network to discover remote tags.
 
-If you pass SHAs instead of tag names, behavior is unchanged: each sub-repo uses the gitlink at the superproject’s good/bad commits.
+On the **workspace / gitman root** (the tree you pointed FRI at, e.g. `birchstream-ih`) FRI uses the exact `--good` / `--bad` strings. In **every other** discovered Git repo it looks up the suffix from the first `@`:
+
+```text
+--good IHE117Y_1.41_01@BirchStreamReferenceBuild@20260224@3545.P.03@2025.47@FW25-5
+--bad  IHE119A_1.50_01@BirchStreamReferenceBuild@20260205@3545.P.22@2026.10@UPLR3
+
+birchstream-ih     full tags as given
+Edk2 / Intel / …   @BirchStreamReferenceBuild@20260224@…   and   @BirchStreamReferenceBuild@20260205@…
+```
+
+If a nested clone has no shared pin, FRI retries the full tag. Repo names are not hardcoded.
 
 ## 3. gitman.yml + disk walk (any Intel or AMD BIOS tree)
 
