@@ -83,67 +83,36 @@ class GitCollector:
         revision = f"{good}..{bad}"
 
         logger.info(
-            "Collecting commits between %s and %s",
+            "Listing commits between %s and %s (metadata only; diffs come next)",
             good[:8],
-            bad[:8]
+            bad[:8],
         )
 
         commits: list[Commit] = []
 
-        for git_commit in self.repo.iter_commits(
-            revision,
-            reverse=True
+        for index, git_commit in enumerate(
+            self.repo.iter_commits(revision, reverse=True),
+            start=1,
         ):
-
-            stats = git_commit.stats.total
-
+            if index % 50 == 0:
+                logger.info("  still listing: %d commits...", index)
             commits.append(
-
                 Commit(
-
                     sha=git_commit.hexsha,
-
                     short_sha=git_commit.hexsha[:8],
-
                     author=str(git_commit.author),
-
                     email=git_commit.author.email,
-
-                    date=datetime.fromtimestamp(
-                        git_commit.committed_date
-                    ),
-
+                    date=datetime.fromtimestamp(git_commit.committed_date),
                     message=git_commit.message.strip(),
-
-                    files=list(
-                        git_commit.stats.files.keys()
-                    ),
-
-                    insertions=stats.get(
-                        "insertions",
-                        0
-                    ),
-
-                    deletions=stats.get(
-                        "deletions",
-                        0
-                    ),
-
-                    is_merge_commit=(
-                        len(git_commit.parents) > 1
-                    ),
-
-                    git_object=git_commit
-
+                    files=[],
+                    insertions=0,
+                    deletions=0,
+                    is_merge_commit=(len(git_commit.parents) > 1),
+                    git_object=git_commit,
                 )
-
             )
 
-        logger.info(
-            "Collected %d commits.",
-            len(commits)
-        )
-
+        logger.info("Listed %d commits. Next: analyze each diff.", len(commits))
         return commits
 
     # ======================================================
@@ -219,16 +188,25 @@ class GitCollector:
             return ""
 
         parent = git_commit.parents[0]
-
-        return self.repo.git.diff(
-
-            parent.hexsha,
-
-            git_commit.hexsha,
-
-            unified=0
-
-        )
+        try:
+            text = self.repo.git.diff(
+                parent.hexsha,
+                git_commit.hexsha,
+                unified=0,
+            )
+        except Exception:
+            return ""
+        # Huge binary/firmware blobs can stall keyword scans.
+        limit = 2_000_000
+        if len(text) > limit:
+            logger.info(
+                "Truncating diff for %s (%s bytes -> %s)",
+                commit.short_sha,
+                f"{len(text):,}",
+                f"{limit:,}",
+            )
+            return text[:limit]
+        return text
 
     # ======================================================
 

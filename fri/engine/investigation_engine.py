@@ -30,6 +30,7 @@ from fri.models import (
     WorkspacePlan,
 )
 from fri.parser.commit_parser import CommitParser
+from fri.utils.progress import ProgressBar
 
 
 class InvestigationEngine:
@@ -63,7 +64,10 @@ class InvestigationEngine:
         return self.investigate_plan(plan, failure)
 
     def investigate_workspace(self, workspace, good, bad, failure) -> RegressionReport:
+        logger.info("Resolving the same good/bad tags in every Git repo (then gitlinks)...")
         plan = self.workspace.plan_from_workspace(workspace, good, bad)
+        moved = sum(1 for item in plan.deltas if item.status == "changed")
+        logger.info("Pin-set: %d repo(s) moved of %d listed.", moved, len(plan.deltas))
         return self.investigate_plan(plan, failure)
 
     def investigate_manifest(self, manifest, failure) -> RegressionReport:
@@ -89,10 +93,21 @@ class InvestigationEngine:
         all_commits = []
         regression_candidates: list[RegressionCandidate] = []
         count_by_repo: dict[str, int] = {}
+        windows = [window for window in plan.windows if window.good_sha != window.bad_sha]
+        logger.info(
+            "Analyzing %d repo window(s). This can take several minutes; a progress bar is on stderr.",
+            len(windows),
+        )
 
-        for window in plan.windows:
-            if window.good_sha == window.bad_sha:
-                continue
+        for repo_index, window in enumerate(windows, start=1):
+            logger.info(
+                "Repo %d/%d: %s  %s..%s",
+                repo_index,
+                len(windows),
+                window.name,
+                window.good_sha[:8],
+                window.bad_sha[:8],
+            )
             try:
                 collector = GitCollector(window.path)
                 commits = collector.get_commits(window.good_sha, window.bad_sha)
@@ -100,13 +115,27 @@ class InvestigationEngine:
                 logger.warning("Skipping %s: %s", window.name, exc)
                 continue
             count_by_repo[window.name] = len(commits)
-            for commit in commits:
+            bar = ProgressBar(f"{repo_index}/{len(windows)} {window.name}", len(commits))
+            for index, commit in enumerate(commits, start=1):
+                bar.update(index, commit.short_sha)
+                if index == 1 or index % 25 == 0 or index == len(commits):
+                    logger.info(
+                        "  %s: %d/%d %s",
+                        window.name,
+                        index,
+                        len(commits),
+                        commit.short_sha,
+                    )
                 commit.repo_name = window.name
                 commit.repo_path = window.path
-                commit = self.parser.parse(commit)
-                commit = self.classifier.classify(commit)
                 diff_text = collector.get_diff(commit)
                 diff = self.diff.analyze(diff_text)
+                if diff.modified_files:
+                    commit.files = diff.modified_files
+                commit.insertions = diff.added_lines
+                commit.deletions = diff.removed_lines
+                commit = self.parser.parse(commit)
+                commit = self.classifier.classify(commit)
                 candidate = self.candidates.evaluate(commit, failure_key, diff)
                 candidate.evidence.insert(0, f"Repository: {window.name}")
                 candidate.reasons.insert(
@@ -115,6 +144,7 @@ class InvestigationEngine:
                 )
                 regression_candidates.append(candidate)
                 all_commits.append(commit)
+            bar.close()
 
         for delta in report.repo_deltas:
             delta.commit_count = count_by_repo.get(delta.name, 0)

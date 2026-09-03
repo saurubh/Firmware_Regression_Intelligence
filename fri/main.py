@@ -48,6 +48,9 @@ def main() -> int:
         print("--good and --bad are required with --workspace.")
         return 2
 
+    if args.verbose:
+        logger.setLevel("DEBUG")
+
     logger.info("=" * 80)
     logger.info("Firmware Regression Intelligence")
     logger.info("=" * 80)
