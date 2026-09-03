@@ -99,7 +99,9 @@ sources:
     )
     repos = {commit.repo_name for commit in report.commits}
     assert "Edk2" in repos
-    assert report.statistics.repo_count >= 1
+    assert "AgesaPkg" in repos
+    assert report.statistics.repo_count == 3
+    assert report.statistics.total_commits == len(report.commits)
 
 
 def test_cli_accepts_gitman_flag():

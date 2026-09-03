@@ -102,9 +102,18 @@ class InvestigationEngine:
         count_by_repo: dict[str, int] = {}
         windows = [window for window in plan.windows if window.good_sha != window.bad_sha]
         logger.info(
-            "Analyzing %d repo window(s). This can take several minutes; a progress bar is on stderr.",
+            "Analyzing %d repo window(s): %s",
             len(windows),
+            ", ".join(window.name for window in windows) or "(none)",
         )
+        if len(windows) == 1:
+            logger.warning(
+                "Only 1 repo window (%s). Nested clones such as Edk2, Intel, "
+                "and Lenovo/* are not in this run. Use "
+                "`fri investigate --gitman <tree>/gitman.yml` (not --repo / "
+                "not --workspace alone) and FRI 2.6+.",
+                windows[0].name,
+            )
 
         for repo_index, window in enumerate(windows, start=1):
             logger.info(
@@ -122,6 +131,11 @@ class InvestigationEngine:
                 logger.warning("Skipping %s: %s", window.name, exc)
                 continue
             count_by_repo[window.name] = len(commits)
+            logger.info(
+                "%s: %d commits between pins (not the grand total yet)",
+                window.name,
+                len(commits),
+            )
             bar = ProgressBar(f"{repo_index}/{len(windows)} {window.name}", len(commits))
             for index, commit in enumerate(commits, start=1):
                 try:
@@ -163,6 +177,17 @@ class InvestigationEngine:
                     )
             bar.close()
             logger.info("  %s: finished %d commits", window.name, len(commits))
+
+        logger.info(
+            "Grand total: %d commits across %d repo(s)%s",
+            sum(count_by_repo.values()),
+            len(count_by_repo),
+            (
+                " — " + ", ".join(f"{name}={n}" for name, n in count_by_repo.items())
+                if count_by_repo
+                else ""
+            ),
+        )
 
         for delta in report.repo_deltas:
             delta.commit_count = count_by_repo.get(delta.name, 0)

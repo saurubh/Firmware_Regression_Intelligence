@@ -738,6 +738,15 @@ fri investigate \
 
 Missing clones listed only in gitman.yml show as `missing`. FRI does not clone `repo:` URLs.
 
+**If `pins` lists 9 changed repos but `investigate` still looks like 215 commits:** that 215 is **only `birchstream-ih`** (the first window). It is not the grand total. Confirm:
+
+1. `fri --version` is **2.7.1** or newer.
+2. The command is `fri investigate --gitman …/gitman.yml`, **not** `--repo` and not `--workspace` alone.
+3. The log has `Analyzing 9 repo window(s): birchstream-ih, Edk2, …` then `Repo 2/9: Edk2`. A line `Only 1 repo window` means nested clones were never queued.
+4. After every repo finishes you should see `Grand total: … commits across N repo(s) — birchstream-ih=215, Edk2=…`.
+
+`fri pins --gitman` only resolves tags. `investigate` then walks each **changed** window in that same order. The first listing (`Listed 215 commits in this repo`) is expected and does not mean Edk2/Intel were skipped.
+
 ## 4. Explicit pin manifest
 
 When repos are siblings (not submodules), or you already know the SHAs from a build database:

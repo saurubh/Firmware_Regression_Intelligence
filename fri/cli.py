@@ -33,11 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument("--repo", help="Single Git repository")
     source.add_argument(
         "--workspace",
-        help="BIOS superproject with edk2 / Intel / platform submodules",
+        help="BIOS superproject (.gitmodules + nested Git clones). "
+        "For a gitman tree (Edk2, Intel, Lenovo, …) use --gitman instead.",
     )
     source.add_argument(
         "--gitman",
-        help="gitman.yml: inspect each sources[].name folder for the same --good/--bad tags",
+        help="gitman.yml: investigate every sources[].name clone (and other "
+        "Git worktrees under location). Required for Birch Stream gitman trees.",
     )
     source.add_argument(
         "--manifest",

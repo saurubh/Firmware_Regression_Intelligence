@@ -151,7 +151,7 @@ class GitCollector:
                 )
             )
 
-        logger.info("Listed %d commits. Next: analyze each diff.", len(commits))
+        logger.info("Listed %d commits in this repo. Next: analyze each diff.", len(commits))
         return commits
 
     # ======================================================
