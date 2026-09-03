@@ -2,6 +2,7 @@ from pathlib import Path
 
 from git import Repo
 
+from fri.collector.git_collector import _is_source
 from fri.engine.investigation_engine import InvestigationEngine
 from fri.main import _doctor, _topics
 
@@ -45,6 +46,14 @@ def test_end_to_end_os_boot_investigation(tmp_path: Path):
     assert report.bisect is not None
     assert report.covered_topics
     assert "acpi" in report.related_topics
+
+
+def test_source_filter_skips_firmware_binaries():
+    assert _is_source("MdeModulePkg/BdsDxe/BdsEntry.c")
+    assert _is_source("PlatformPkg/AcpiTables/Dsdt.asl")
+    assert not _is_source("Fsp/Fsp.fd")
+    assert not _is_source("Microcode/ucode.bin")
+    assert not _is_source("Build/BIOS.efi")
 
 
 def test_doctor_and_topics_commands(capsys):

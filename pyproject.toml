@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fri"
-version = "2.4.1"
+version = "2.4.2"
 description = "Firmware Regression Intelligence Framework"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -117,20 +117,20 @@ class InvestigationEngine:
             count_by_repo[window.name] = len(commits)
             bar = ProgressBar(f"{repo_index}/{len(windows)} {window.name}", len(commits))
             for index, commit in enumerate(commits, start=1):
-                bar.update(index, commit.short_sha)
-                if index == 1 or index % 25 == 0 or index == len(commits):
-                    logger.info(
-                        "  %s: %d/%d %s",
-                        window.name,
-                        index,
-                        len(commits),
-                        commit.short_sha,
-                    )
+                bar.update(index, f"files {commit.short_sha}")
                 commit.repo_name = window.name
                 commit.repo_path = window.path
-                diff_text = collector.get_diff(commit)
+                commit.files = collector.changed_paths(commit)
+                bar.update(
+                    index,
+                    f"diff {commit.short_sha} ({len(commit.files)} files)",
+                )
+                diff_text = collector.get_diff(
+                    commit,
+                    heartbeat=lambda detail, i=index, progress=bar: progress.update(i, detail),
+                )
                 diff = self.diff.analyze(diff_text)
-                if diff.modified_files:
+                if not commit.files and diff.modified_files:
                     commit.files = diff.modified_files
                 commit.insertions = diff.added_lines
                 commit.deletions = diff.removed_lines
@@ -145,6 +145,7 @@ class InvestigationEngine:
                 regression_candidates.append(candidate)
                 all_commits.append(commit)
             bar.close()
+            logger.info("  %s: finished %d commits", window.name, len(commits))
 
         for delta in report.repo_deltas:
             delta.commit_count = count_by_repo.get(delta.name, 0)
