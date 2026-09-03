@@ -594,10 +594,12 @@ Or use the project setup script:
 
 ## Install FRI
 
-Install the project in editable mode:
+Install the project in editable mode (**activate the venv first**):
 
 ```bash
-pip install -e .
+source venv/bin/activate
+python -m pip install -U pip setuptools wheel
+python -m pip install -e .
 ```
 
 Development extras:

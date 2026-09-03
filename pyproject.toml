@@ -1,7 +1,7 @@
 [build-system]
 requires = [
     "setuptools>=68.0",
-    "wheel"
+    "wheel>=0.41.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fri"
-version = "2.6.0"
+version = "2.6.1"
 description = "Firmware Regression Intelligence Framework"
 readme = "README.md"
 requires-python = ">=3.10"
